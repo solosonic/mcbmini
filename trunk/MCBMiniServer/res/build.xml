@@ -1,0 +1,39 @@
+<project name="MCBMini" default="dist" basedir="..">
+    <description>
+        simple example build file
+    </description>
+	<property name="dependencies" value="lib/core.jar:lib/ioiolib.jar:lib/RXTXcomm.jar:lib/jdom.jar"/>
+
+	<target name="init">
+		<tstamp/>
+    	<mkdir dir="bin"/>
+	    <mkdir dir="dist"/>
+	</target>
+
+  <target name="compile" depends="cleanbin,init">
+    <javac srcdir="src" destdir="bin" classpath="${dependencies}" debug="true"/>
+  </target>
+
+  <target name="dist" depends="compile">
+    <jar jarfile="dist/MCBMini.jar" basedir="bin"/>
+  </target>
+
+  <target name="app" depends="compile">
+	<jar destfile="dist/MCBMiniApp.jar" basedir="bin">
+		<zipgroupfileset dir="lib" includes="*.jar" />
+		<manifest>
+      		<attribute name="Main-Class" value="mcbmini.MCBMiniGUI"/>
+	    </manifest>
+	</jar>
+  </target>
+
+  <target name="clean" depends="cleanbin,cleandist"/>
+
+	  <target name="cleanbin">
+	    <delete dir="bin"/>
+	  </target>
+	  <target name="cleandist">
+	    <delete dir="dist"/>
+	  </target>
+
+</project>
