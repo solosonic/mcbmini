@@ -1,0 +1,55 @@
+Change history
+-----------------------
+
+Added in Version 1:
+	- A version number hard-coded into the firmware that can be polled
+	- ENCODER_VALUE and POT_VALUE can now be polled (or set in the case of encoder) regardless of feedback mode
+	- I accumulator max was increased and its decay decreased
+
+Added in Version 2:
+	- MAX_PWM_DUTY_CYCLE can now be set and polled from the boards
+	- Changed the default value of output_divisor to 0
+
+Added in Version 3:
+	- A little more checking if the NEW ID packet is correct (with a redundant byte)
+	- A new error message if we receive an invalid ID packet
+
+Added in Version 4:
+ - No functional difference
+ - Set all pins as inputs in the beginning rather than outputs to minimize danger of fighting with encoder output pins for example
+	- Slight bug fix, we were calling the changeID function a log (not actually changing the ID though) but this was unneccessary
+
+Added in Version 5:
+ - This version has a lot of changes made to be more robust to fast encoder tick trains. Mainly all the ISRs were sped up as much as possible and are now made reentrant (not blocking). Hopefully there won't be any fall-out from that
+ - I am mostly worried that now there is a tiny delay from when we receive a full packet for us and when we acquire the bus line (same for receiving a packet not for us and letting the line go). This is hopefully a minimal delay that doesn't result in any bus problems
+
+Added in Version 6:
+ - a new command for a slow enable time constant
+ - a new command for a debug message
+
+Added in Version 7:
+ - a new error code for a packet overflow, when we receive packets too fast and now we aren't responding fast enough
+
+Added in Version 8:
+ - changed the I dynamics a little bit, scaled them down so there is more resolution in the I parameter, also raised the limit
+
+Added in Version 9: (May 4th 2012)
+ - moved the initialization of the encoder pins to above the 200 ms initialization sleep (for transients to settle)
+ - enable interrupts in the init loop early now so the encoder ticks can be caught in the sleep method
+ - added a TICK_OFFSET packet so that a server can tell us to offset our tick counting by a number, this is useful when the boards get reset because since reset they might have counted some ticks that we want to keep track of and add to the last known value from the server
+
+Added in Version 10: (July 16th 2012)
+ - Don't use I component when in velocity mode
+
+Added in Version 11: (July 24th 2012)
+ - Changed a lot of the I calculations (using a smart saturation strategy). Inspirations from here: http://www.embeddedrelated.com/showarticle/121.php
+ - Put a cap on the d_error to filter out high frequencies (like the first set position kick)
+ - reset the timeroverflow for checking for a timeout whenever a timeout happens (before it would happen on every cycle after the timeout happened)
+ - CHANGED MAIN PID UPDATE RATE TO 100Hz from about 200Hz (this might cause some tuning errors, especially with the d gain in potentiometer applications)
+ - refactored a lot of the code to use structs, split into motor.h, pid.h and mcb_mini.h/c
+ - Changed the startup speed from eights to 32ths (smoother). This causes the slow_enable_const constant to be different (10 is pretty good)
+ - Removed channel specific special commands for 2 target positions and only one feedback value (the channel is now communicated the regular way)
+ - Changed the way initialization of the boards works, now whenever any real parameter is sent to the boards, the PID is set to uninitialized, until the ENABLE value is set, ON or OFF it will set the boards to be initialized (so it always must be sent last in a parameter packet burst)
+
+Changed in version 12: (September 12th 2012)
+ - Removed all dependencies on the Pascal Stang libraries, using my own lifo and fifo buffers now

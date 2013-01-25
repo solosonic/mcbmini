@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Root>
+	<port>/dev/tty.usbserial-A6005rLu</port>
+	<MiniBoards>
+		<MiniBoard>
+			<id>5</id>
+			<Channels>
+				<Motor>
+					<channel>A</channel>
+					<pos_p_gain>40</pos_p_gain>
+					<pos_d_gain>20</pos_d_gain>
+					<pos_i_gain>10</pos_i_gain>
+					<pos_downscale>4</pos_downscale>
+
+					<vel_p_gain>25</vel_p_gain>
+					<vel_d_gain>100</vel_d_gain>
+					<vel_i_gain>50</vel_i_gain>
+					<vel_downscale>0</vel_downscale>
+					<vel_time_delta>2</vel_time_delta>
+
+					<max_velocity>20</max_velocity>
+					<max_acceleration>20</max_acceleration>
+					<slow_enable_const>10</slow_enable_const>
+
+					<polarity>FLIPPED</polarity>
+					<feedback>ENCODER</feedback>
+					<control>POSITION</control>
+					<extra_pin>OFF</extra_pin>
+					<stream>OFF</stream>
+				</Motor>
+				<Motor>
+					<channel>B</channel>
+
+					<pos_p_gain>40</pos_p_gain>
+					<pos_d_gain>20</pos_d_gain>
+					<pos_i_gain>10</pos_i_gain>
+					<pos_downscale>4</pos_downscale>
+
+					<vel_p_gain>15</vel_p_gain>
+					<vel_d_gain>30</vel_d_gain>
+					<vel_i_gain>25</vel_i_gain>
+					<vel_downscale>0</vel_downscale>
+					<vel_time_delta>4</vel_time_delta>
+
+					<max_velocity>20</max_velocity>
+					<max_acceleration>20</max_acceleration>
+					<slow_enable_const>10</slow_enable_const>
+
+					<polarity>REGULAR</polarity>
+					<feedback>ENCODER</feedback>
+					<control>MIXED</control>
+					<extra_pin>OFF</extra_pin>
+					<stream>ON</stream>
+				</Motor>
+			</Channels>
+		</MiniBoard>
+	</MiniBoards>
+</Root>
