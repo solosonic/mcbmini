@@ -1,0 +1,16 @@
+#!/bin/sh
+
+path=usb
+programmer=avrispmkII
+eepromfile=eepromdata.r
+
+##writes eeprom from eepromdata.r (hex format)##
+##format:
+##	512 bytes, all is FF's
+##	starting at 10,20,30,40, sequence of 6 bytes is:
+##		01 02 03 04 id id+10
+##	e.g., for id 2:
+##		01 02 03 04 02 0C
+
+avrdude -p m168 -P $path -c $programmer -B 32 -U eeprom:w:$eepromfile:r
+exit $?

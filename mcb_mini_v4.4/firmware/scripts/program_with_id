@@ -1,0 +1,48 @@
+#!/bin/sh
+
+if [ "$#" -lt "1" ] 
+then 
+    echo "Please pass in the desired board ID";    
+    exit
+fi
+
+# Compiles the source
+cd ..
+make clean
+make
+rc=$?
+if [[ $rc != 0 ]] ; then
+	echo "Compiling firmware exited with ERROR"
+    exit $rc
+fi
+
+cd scripts
+
+# Flash the firmware
+avrdude -p m168 -P usb -c avrispmkII -U flash:w:../mcb_mini.hex
+rc=$?
+if [[ $rc != 0 ]] ; then
+	echo "Flashing firmware exited with ERROR"
+    exit $rc
+fi
+
+
+# Write the proper ID to the EEPROM of device
+./genEEPROMfile $1
+rc=$?
+if [[ $rc != 0 ]] ; then
+	echo "Generating EEPROM exited with ERROR"
+    exit $rc
+fi
+
+./writeEEPROM
+rc=$?
+if [[ $rc != 0 ]] ; then
+	echo "Writing EEPROM exited with ERROR"
+    exit $rc
+fi
+
+echo ""
+echo "====================="
+echo "       SUCCESS"
+echo "====================="

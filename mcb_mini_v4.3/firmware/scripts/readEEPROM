@@ -1,0 +1,9 @@
+#!/bin/sh
+
+path=/dev/tty.usbserial
+programmer=stk500v2
+eepromfile=eepromdata.r
+
+##reads eeprom to eepromdata.r (hex format)##
+
+avrdude -p m168 -P $path -c $programmer -B 32 -U eeprom:r:$eepromfile:r
