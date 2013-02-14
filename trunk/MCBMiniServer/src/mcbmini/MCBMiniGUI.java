@@ -1,10 +1,10 @@
 /* Description and License
- * MCBMini is a complete, open-source, flexible and scalable 
- * motor control scheme with board designs, firmware and host 
- * software. 
+ * MCBMini is a complete, open-source, flexible and scalable
+ * motor control scheme with board designs, firmware and host
+ * software.
  * This is the host software for MCBMini called MCBMiniServer
  * The MCBMini project can be downloaded from:
- * http://code.google.com/p/mcbmini/ 
+ * http://code.google.com/p/mcbmini/
  *
  * (c) Sigurdur Orn Adalgeirsson (siggi@alum.mit.edu)
  *
@@ -23,7 +23,7 @@
  * Free Software Foundation, Inc., 59 Temple Place, Suite 330,
  * Boston, MA  02111-1307  USA
  */
- 
+
 package mcbmini;
 
 import javax.swing.BorderFactory;
@@ -145,27 +145,6 @@ public class MCBMiniGUI {
 		 */
 		if( args.length == 0 ){
 			printHelp();
-
-			final JFileChooser fc = new JFileChooser(new File(System.getProperty("user.dir")));
-			fc.setFileFilter(new FileFilter() {
-				//@Override
-				public String getDescription() {
-					return "Motor config files";
-				}
-
-				//@Override
-				public boolean accept(File f) {
-					if( f.isDirectory() || f.getName().toLowerCase().endsWith(".xml") ) return true;
-					return false;
-				}
-			});
-			fc.setName("Select motor config file");
-			int returnVal = fc.showOpenDialog(null);
-			if( returnVal == JFileChooser.CANCEL_OPTION || fc.getSelectedFile().isDirectory()){
-				System.exit(0);
-			}
-
-			xml_file = fc.getSelectedFile().getAbsolutePath();
 		}
 		else{
 			/*
@@ -207,8 +186,26 @@ public class MCBMiniGUI {
 			}
 
 			if( xml_file == null ){
-				printHelp();
-				System.exit(0);
+				final JFileChooser fc = new JFileChooser(new File(System.getProperty("user.dir")));
+				fc.setFileFilter(new FileFilter() {
+					//@Override
+					public String getDescription() {
+						return "Motor config files";
+					}
+
+					//@Override
+					public boolean accept(File f) {
+						if( f.isDirectory() || f.getName().toLowerCase().endsWith(".xml") ) return true;
+						return false;
+					}
+				});
+				fc.setName("Select motor config file");
+				int returnVal = fc.showOpenDialog(null);
+				if( returnVal == JFileChooser.CANCEL_OPTION || fc.getSelectedFile().isDirectory()){
+					System.exit(0);
+				}
+
+				xml_file = fc.getSelectedFile().getAbsolutePath();
 			}
 		}
 
