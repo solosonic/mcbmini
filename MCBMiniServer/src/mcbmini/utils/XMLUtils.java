@@ -38,7 +38,9 @@ import mcbmini.MCBMiniConstants.ChannelParameter;
 import mcbmini.MCBMiniConstants.ExtraPinMode;
 import mcbmini.MCBMiniConstants.MotorPolarity;
 import mcbmini.MCBMiniConstants.ControlMode;
+import mcbmini.MCBMiniServer;
 
+import org.jdom.Attribute;
 import org.jdom.Document;
 import org.jdom.Element;
 import org.jdom.JDOMException;
@@ -80,6 +82,8 @@ public class XMLUtils {
 			e.printStackTrace();
 		}
 
+		
+		
 		return root;
 	}
 
@@ -100,18 +104,42 @@ public class XMLUtils {
 
 		Element root = findMCBRoot( loadXMLFile(path) );
 		if( root == null ){
-			throw new Exception("Can't find <MiniBoards> tag in xml file");
+			throw new Exception("Can't find <Root> tag in configuration file");
 		}
 
+		double xml_version = -1;
+		Attribute attr_xml_version = root.getAttribute("version");
+		if( attr_xml_version != null ){
+			xml_version = Double.parseDouble( attr_xml_version.getValue() );
+		}
+		else{
+			xml_version = 1.0; // This is the version number for the modern XML format that just hasn't got the "version" flag yet
+		}		
+		
 		res.port_name = getOptional(root, "port");
 		res.boards = new ArrayList<MCBMiniBoard>();
 
+		// See if this configuration file requires a certain minimum firmware version
 		String min_firmv_version = getOptional(root, "firmware_version");
 		if( min_firmv_version != null ) res.minimum_firmware_version = Integer.parseInt(min_firmv_version);
 
 		if(root.getChild("MiniBoards") == null ) throw new RuntimeException("XML file has no MiniBoards list !");
 		List<Element> miniBoards = root.getChild("MiniBoards").getChildren();
 
+		// Here we do a quick test to check if an outdated configuration file is being used (created before versioning numbers)
+		if( miniBoards.size() > 0 ){
+			Element first_board = miniBoards.get(0);	
+			if( first_board.getChild("Channels") != null && first_board.getChild("Channels").getChild("Motor") != null &&  first_board.getChild("Channels").getChild("Motor").getChild("pgain") != null ){
+				xml_version = 0.1;
+			}
+		}
+		System.out.println("MCBMini: Parsing configuration file \""+path+"\" of version: "+xml_version);
+
+		if( xml_version < MCBMiniServer.getMinimumConfigFileVersion() ){
+			throw new RuntimeException("MCBMini: Config file is outdated, please upgrade to a more modern version. This version of MCBMiniServer requires a minimum version number of: "+MCBMiniServer.getMinimumConfigFileVersion());
+		}
+
+		// Finally we process every board
 		for(Element board : miniBoards){
 			// Parse board information
 			MCBMiniBoard miniBoard = parseMCBMiniBoard(board);

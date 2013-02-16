@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<Root>
-	<port>/dev/tty.usbserial-A6005rLu</port>
+<Root version="1.1">
+	<port>/dev/cu.usbserial-A5011LN7</port>
 	<MiniBoards>
 		<MiniBoard>
-			<id>5</id>
+			<id>1</id>
 			<Channels>
 				<Motor>
 					<channel>A</channel>
@@ -46,7 +46,7 @@
 					<max_acceleration>20</max_acceleration>
 					<slow_enable_const>10</slow_enable_const>
 
-					<polarity>REGULAR</polarity>
+					<polarity>FLIPPED</polarity>
 					<feedback>ENCODER</feedback>
 					<control>MIXED</control>
 					<extra_pin>OFF</extra_pin>

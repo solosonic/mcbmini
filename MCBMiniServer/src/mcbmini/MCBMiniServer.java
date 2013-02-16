@@ -64,6 +64,18 @@ import org.jdom.Element;
  */
 public class MCBMiniServer{
 
+	private static final double server_version = 0.2;
+
+	private static final double minimum_config_file_version = 1.0;
+	
+	public static double getServerVersion(){
+		return server_version;
+	}
+
+	public static double getMinimumConfigFileVersion(){
+		return minimum_config_file_version;
+	}
+
 	public static final boolean DEBUG = false;
 
 	protected static boolean SHOULD_RESEND_LAST_KNOWN_TICKS_ON_BOARD_RESET = true;
@@ -294,7 +306,7 @@ public class MCBMiniServer{
 			sendRequestForResponse(board, Channel.A, Command.FIRMWARE_VERSION, new FirmwareCheckingResponseHandler());
 		}
 	}
-
+	
 	public int getMinimumFirmwareVersion(){
 		return this.minimum_firmware_version;
 	}
