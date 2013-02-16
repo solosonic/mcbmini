@@ -184,36 +184,37 @@ public class MCBMiniGUI {
 					System.out.println("Setting native rxtx library path to \""+lib_path+"\"");
 				}
 			}
-
-			if( xml_file == null ){
-				final JFileChooser fc = new JFileChooser(new File(System.getProperty("user.dir")));
-				fc.setFileFilter(new FileFilter() {
-					//@Override
-					public String getDescription() {
-						return "Motor config files";
-					}
-
-					//@Override
-					public boolean accept(File f) {
-						if( f.isDirectory() || f.getName().toLowerCase().endsWith(".xml") ) return true;
-						return false;
-					}
-				});
-				fc.setName("Select motor config file");
-				int returnVal = fc.showOpenDialog(null);
-				if( returnVal == JFileChooser.CANCEL_OPTION || fc.getSelectedFile().isDirectory()){
-					System.exit(0);
-				}
-
-				xml_file = fc.getSelectedFile().getAbsolutePath();
-			}
 		}
-
+		
 		if( !debug && MCBMiniNativeLoader.shouldLookForNative() && MCBMiniNativeLoader.findLibraryLocation() == null ){
 			error("Can't find native libraries, make sure that the jar is next to the \"lib\" folder");
 			System.exit(0);
 		}
 
+		if( xml_file == null ){
+			final JFileChooser fc = new JFileChooser(new File(System.getProperty("user.dir")));
+			fc.setFileFilter(new FileFilter() {
+				//@Override
+				public String getDescription() {
+					return "Motor config files";
+				}
+
+				//@Override
+				public boolean accept(File f) {
+					if( f.isDirectory() || f.getName().toLowerCase().endsWith(".xml") ) return true;
+					return false;
+				}
+			});
+			fc.setName("Select motor config file");
+			int returnVal = fc.showOpenDialog(null);
+			if( returnVal == JFileChooser.CANCEL_OPTION || fc.getSelectedFile().isDirectory()){
+				System.exit(0);
+			}
+
+			xml_file = fc.getSelectedFile().getAbsolutePath();
+		}
+
+		
 		XMLResults xml_results = null;
 		try {
 			xml_results = XMLUtils.parseMCBMiniConfigFile(xml_file);
