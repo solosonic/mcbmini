@@ -64,7 +64,7 @@ import org.jdom.Element;
  */
 public class MCBMiniServer{
 
-	private static final double server_version = 0.2;
+	private static final double server_version = 1.0;
 
 	private static final double minimum_config_file_version = 1.0;
 	
