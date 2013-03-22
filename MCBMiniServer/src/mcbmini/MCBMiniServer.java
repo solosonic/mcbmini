@@ -151,6 +151,10 @@ public class MCBMiniServer{
 
 	public enum FaultHandlingPolicy {DO_NOTHING, RE_ENABLE};
 
+	private int board_firmware_response_count;
+	private int lowest_reported_firmware_version;
+	private boolean board_firmware_has_been_confirmed = false;;
+
 	private FaultHandlingPolicy fault_handling_policy = FaultHandlingPolicy.DO_NOTHING;
 
 	public MCBMiniServer(String port_name, ArrayList<MCBMiniBoard> boards) throws IOException{
@@ -209,8 +213,6 @@ public class MCBMiniServer{
 		for (MCBMiniBoard board : boards) {
 			board_id_to_board_map.put(Integer.valueOf(board.getId()), board);
 		}
-
-		response_types = createResponseTypes();
 
 		/*
 		 * This will set the sleep granularity to 1ms for some reason
@@ -302,20 +304,37 @@ public class MCBMiniServer{
 		/*
 		 * Here we check to see if the firmware of all connected boards is good enough
 		 */
+		board_firmware_response_count = 0;
+		lowest_reported_firmware_version = Integer.MAX_VALUE;
+		System.out.print("Waiting for all boards to report their firmware, IDs: ");
 		for (MCBMiniBoard board : boards) {
 			sendRequestForResponse(board, Channel.A, Command.FIRMWARE_VERSION, new FirmwareCheckingResponseHandler());
 		}
+		for (int i=0; i<boards.size()-1; i++) System.out.print(boards.get(i).getId()+", ");
+		System.out.println(boards.get(boards.size()-1).getId()+":");
 	}
 
 	protected ResponseType[] createResponseTypes(){
-		 return new ResponseType[]{
+		if( lowest_reported_firmware_version <= 16 ){
+			return new ResponseType[]{
+					ResponseType.ACTUAL_TICK, ResponseType.ACTUAL_TICK,
+					ResponseType.ACTUAL_TICK, ResponseType.ACTUAL_TICK,
+					ResponseType.ACTUAL_TICK, ResponseType.ACTUAL_TICK,
+					ResponseType.ACTUAL_TICK, ResponseType.ACTUAL_TICK,
+					ResponseType.ACTUAL_TICK, ResponseType.ACTUAL_TICK,
+					ResponseType.MOTOR_CURRENT, ResponseType.MOTOR_CURRENT,
+			};
+		}
+		else{
+			return new ResponseType[]{
 					ResponseType.ACTUAL_TICK_TWO,
 					ResponseType.ACTUAL_TICK_TWO,
 					ResponseType.ACTUAL_TICK_TWO,
 					ResponseType.ACTUAL_TICK_TWO,
 					ResponseType.ACTUAL_TICK_TWO,
 					ResponseType.MOTOR_CURRENT_TWO,
-				};
+			};
+		}
 	}
 
 	public int getMinimumFirmwareVersion(){
@@ -375,33 +394,76 @@ public class MCBMiniServer{
 			handleCommandInBuffer( buffer );
 		}
 
-		/*
-		 * Check packet response flags
-		 */
-		long cur_time = System.currentTimeMillis();
-		if( last_check_for_timeouts_ms == -1 ) last_check_for_timeouts_ms = cur_time;
-		if( cur_time - last_check_for_timeouts_ms > 1000 ){
+		if( board_firmware_has_been_confirmed ){
+			/*
+			 * Check packet response flags
+			 */
+			long cur_time = System.currentTimeMillis();
+			if( last_check_for_timeouts_ms == -1 ) last_check_for_timeouts_ms = cur_time;
+			if( cur_time - last_check_for_timeouts_ms > 1000 ){
+				for (MCBMiniBoard board : boards) {
+					if( cur_time - board.last_received_message_ms  > 500 ){
+						System.out.println("No response from board ID: "+board.getId());
+						board.increaseErrorCount(Error.NO_RESPONSE);
+					}
+				}
+				last_check_for_timeouts_ms = cur_time;
+			}
+
+			/*
+			 * See if we need to update parameters to any board
+			 */
 			for (MCBMiniBoard board : boards) {
-				if( cur_time - board.last_received_message_ms  > 500 ){
-					System.out.println("No response from board ID: "+board.getId());
-					board.increaseErrorCount(Error.NO_RESPONSE);
+				for (Channel channel : Channel.values()) {
+					HashMap<Command, Integer> dirtyParameters = board.getDirtyParameters(channel);
+					if( dirtyParameters != null ){
+						ser_manager.writeParameterPacket(board, channel, dirtyParameters);
+
+						// Here we stop the current loop as we already have a big buffer to push out
+						ser_manager.sendTxBuffer();
+						return;
+					}
 				}
 			}
-			last_check_for_timeouts_ms = cur_time;
-		}
 
-		/*
-		 * See if we need to update parameters to any board
-		 */
-		for (MCBMiniBoard board : boards) {
-			for (Channel channel : Channel.values()) {
-				HashMap<Command, Integer> dirtyParameters = board.getDirtyParameters(channel);
-				if( dirtyParameters != null ){
-					ser_manager.writeParameterPacket(board, channel, dirtyParameters);
+			/*
+			 * Then we send updated positions and get positions and currents back
+			 */
 
-					// Here we stop the current loop as we already have a big buffer to push out
-					ser_manager.sendTxBuffer();
-					return;
+			// Alternate feedback from the two channels of all boards
+			Channel response_channel = CHANNELS[ internal_update_counter % 2 ];
+
+			// Every Xth time, we get electric current information instead of position feedback
+			ResponseType response_type = response_types[ internal_update_counter % response_types.length ];
+
+			/*
+			 * For older firmware we just stream positions all the time
+			 */
+			for (MCBMiniBoard board : boards) {
+				Integer target_A, target_B;
+				if( minimum_firmware_version < 16 ){
+					target_A = board.getTargetTick(Channel.A);
+					target_B = board.getTargetTick(Channel.B);
+				}
+				// Otherwise we send a special value when the target position hasn't changed
+				else{
+					target_A = board.getFreshTargetTick(Channel.A);
+					target_B = board.getFreshTargetTick(Channel.B);
+					if( target_A == null ) target_A = Integer.MAX_VALUE;
+					if( target_B == null ) target_B = Integer.MAX_VALUE;
+				}
+
+				ser_manager.writeSpecializedPacket(board, response_type, response_channel, target_A, target_B);
+
+				/*
+				 * Here we handle the Extra pin functionality
+				 */
+				ExtraPinMode extraPinMode = board.getExtraPinMode(response_channel);
+				if( extraPinMode == ExtraPinMode.ANALOG ){
+					ser_manager.writeGenericPacket(board, response_channel, Command.EXTRA_PIN_VALUE, true, 0);
+				}
+				else if( extraPinMode == ExtraPinMode.SERVO ){
+					ser_manager.writeGenericPacket(board, response_channel, Command.EXTRA_PIN_VALUE, false, board.getExtraPinValue(response_channel));
 				}
 			}
 		}
@@ -415,47 +477,6 @@ public class MCBMiniServer{
 				Request r = i.next();
 				ser_manager.writeGenericPacket(r.board, r.channel, r.command, r.should_get_response, r.value);
 				i.remove();
-			}
-		}
-
-		/*
-		 * Then we send updated positions and get positions and currents back
-		 */
-
-		// Alternate feedback from the two channels of all boards
-		Channel response_channel = CHANNELS[ internal_update_counter % 2 ];
-
-		// Every Xth time, we get electric current information instead of position feedback
-		ResponseType response_type = response_types[ internal_update_counter % response_types.length ];
-
-		/*
-		 * For older firmware we just stream positions all the time
-		 */
-		for (MCBMiniBoard board : boards) {
-			Integer target_A, target_B;
-			if( minimum_firmware_version < 16 ){
-				target_A = board.getTargetTick(Channel.A);
-				target_B = board.getTargetTick(Channel.B);
-			}
-			// Otherwise we send a special value when the target position hasn't changed
-			else{
-				target_A = board.getFreshTargetTick(Channel.A);
-				target_B = board.getFreshTargetTick(Channel.B);
-				if( target_A == null ) target_A = Integer.MAX_VALUE;
-				if( target_B == null ) target_B = Integer.MAX_VALUE;
-			}
-
-			ser_manager.writeSpecializedPacket(board, response_type, response_channel, target_A, target_B);
-
-			/*
-			 * Here we handle the Extra pin functionality
-			 */
-			ExtraPinMode extraPinMode = board.getExtraPinMode(response_channel);
-			if( extraPinMode == ExtraPinMode.ANALOG ){
-				ser_manager.writeGenericPacket(board, response_channel, Command.EXTRA_PIN_VALUE, true, 0);
-			}
-			else if( extraPinMode == ExtraPinMode.SERVO ){
-				ser_manager.writeGenericPacket(board, response_channel, Command.EXTRA_PIN_VALUE, false, board.getExtraPinValue(response_channel));
 			}
 		}
 
@@ -941,11 +962,19 @@ public class MCBMiniServer{
 	private class FirmwareCheckingResponseHandler extends MCBMiniResponseHandler{
 		@Override
 		public void handleResponse(MCBMiniBoard board, Channel channel, Command command, int value) {
+			board_firmware_response_count++;
+			lowest_reported_firmware_version = Math.min(lowest_reported_firmware_version, value);
 			System.out.println("Motorboard "+board.getId()+" reports firmware version: "+value);
 			if( value < minimum_firmware_version ){
 				System.err.println("This version of the server can only talk to boards of firmware version "+minimum_firmware_version+" and higher. Board "+board.getId()+" reports "+value);
 				new RuntimeException().printStackTrace();
 				System.exit(0);
+			}
+
+			if( board_firmware_response_count == boards.size() ){
+				System.out.println("All boards have reported their firmware, lowest firmware version: "+lowest_reported_firmware_version);
+				response_types = createResponseTypes();
+				board_firmware_has_been_confirmed = true;
 			}
 		}
 
