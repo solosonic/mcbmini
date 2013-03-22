@@ -1,27 +1,27 @@
 /*
  * This file is part of the MCBMini firmware.
- * MCBMini is a complete, open-source, flexible and scalable 
- * motor control scheme with board designs, firmware and host 
- * software. 
+ * MCBMini is a complete, open-source, flexible and scalable
+ * motor control scheme with board designs, firmware and host
+ * software.
  * This is the firmware for MCBMini
  * The MCBMini project can be downloaded from:
- * http://code.google.com/p/mcbmini/ 
+ * http://code.google.com/p/mcbmini/
  *
  * (c) Sigurdur Orn Adalgeirsson (siggi@alum.mit.edu)
  *
  * MCBMini firmware is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, version 2 of the License
- * 
+ *
  * MCBMini firmware is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU General Public License
  * along with the MCBMini firmware.  If not, see <http://www.gnu.org/licenses/>.
  */
- 
+
  /*
  * mcb_mini.h
  *
@@ -372,6 +372,15 @@ int32_t volatile debug_msg1;
 #define CMD_MAX_ACCELERATION				40
 #define CMD_VEL_TIME_DELTA					41
 #define CMD_STREAM_MODE						42
+
+#define CMD_2TARGET_TICK_POT				43
+#define CMD_2TARGET_TICK_ENCODER			44
+
+#define CMD_2TARGET_TICK_2ACTUAL			45
+#define CMD_2TARGET_TICK_2VELOCITY			46
+#define CMD_2TARGET_TICK_2MOTOR_CURRENT		47
+#define CMD_2TARGET_TICK_2POT				48
+#define CMD_2TARGET_TICK_2ENCODER			49
 
 /*
  * Error messages
