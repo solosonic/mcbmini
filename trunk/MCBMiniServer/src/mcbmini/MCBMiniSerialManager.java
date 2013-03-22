@@ -1,10 +1,10 @@
 /* Description and License
- * MCBMini is a complete, open-source, flexible and scalable 
- * motor control scheme with board designs, firmware and host 
- * software. 
+ * MCBMini is a complete, open-source, flexible and scalable
+ * motor control scheme with board designs, firmware and host
+ * software.
  * This is the host software for MCBMini called MCBMiniServer
  * The MCBMini project can be downloaded from:
- * http://code.google.com/p/mcbmini/ 
+ * http://code.google.com/p/mcbmini/
  *
  * (c) Sigurdur Orn Adalgeirsson (siggi@alum.mit.edu)
  *
@@ -23,11 +23,12 @@
  * Free Software Foundation, Inc., 59 Temple Place, Suite 330,
  * Boston, MA  02111-1307  USA
  */
- 
+
  package mcbmini;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -41,7 +42,6 @@ import mcbmini.MCBMiniConstants.Command;
 import mcbmini.MCBMiniConstants.DataSize;
 import mcbmini.MCBMiniConstants.Id;
 import mcbmini.serial.PSerial;
-import mcbmini.serial.SerialEventHandler;
 import mcbmini.serial.iSerial;
 import mcbmini.utils.ByteBufferUtils;
 
@@ -131,6 +131,8 @@ public class MCBMiniSerialManager {
 
 					// Make a new packet
 					ByteBuffer packet = ByteBuffer.allocate(256);
+					packet.order(ByteOrder.LITTLE_ENDIAN);
+
 					read_bb.flip();
 					packet.put( read_bb );
 					packet.flip();
@@ -239,10 +241,22 @@ public class MCBMiniSerialManager {
 		putByteInSubCommand( (byte)((in>>24)&0xff) );
 	}
 
-	public static enum FeedbackType{
-		MOTOR_CURRENT,
-		ACTUAL_TICK,
-		ACTUAL_VELOCITY;
+	public static enum ResponseType{
+		MOTOR_CURRENT 		(Command.TWO_TARGET_TICK_MOTOR_CURRENT),
+		MOTOR_CURRENT_TWO 	(Command.TWO_TARGET_TICK_TWO_MOTOR_CURRENT),
+		ACTUAL_TICK			(Command.TWO_TARGET_TICK_ACTUAL),
+		ACTUAL_TICK_TWO		(Command.TWO_TARGET_TICK_TWO_ACTUAL),
+		ACTUAL_VELOCITY 	(Command.TWO_TARGET_TICK_VELOCITY),
+		ACTUAL_VELOCITY_TWO	(Command.TWO_TARGET_TICK_TWO_VELOCITY),
+		ACTUAL_POT			(Command.TWO_TARGET_TICK_POT),
+		ACTUAL_POT_TWO		(Command.TWO_TARGET_TICK_TWO_POT),
+		ACTUAL_ENCODER		(Command.TWO_TARGET_TICK_ENCODER),
+		ACTUAL_ENCODER_TWO	(Command.TWO_TARGET_TICK_TWO_ENCODER);
+
+		public Command feedbackCommand;
+		private ResponseType(Command feedbackCommand){
+			this.feedbackCommand = feedbackCommand;
+		}
 	}
 
 	/**
@@ -254,16 +268,10 @@ public class MCBMiniSerialManager {
 	 * @param targetA
 	 * @param targetB
 	 */
-	protected void writeSpecializedPacket(MCBMiniBoard board, FeedbackType feedback_type, Channel feedback_channel, boolean request_response, int targetA, int targetB){
+	protected void writeSpecializedPacket(MCBMiniBoard board, ResponseType feedback_type, Channel feedback_channel, int targetA, int targetB){
 		startSubCommand();
 
-		byte command_byte = Command.TWO_TARGET_TICK_ACTUAL.command;
-		if( feedback_type == FeedbackType.MOTOR_CURRENT ) command_byte = Command.TWO_TARGET_TICK_MOTOR_CURRENT.command;
-		else if( feedback_type == FeedbackType.ACTUAL_VELOCITY ) command_byte = Command.TWO_TARGET_TICK_VELOCITY.command;
-
-		if( request_response ){
-			command_byte |= 0x80;
-		}
+		byte command_byte = feedback_type.feedbackCommand.command;
 
 		putIntInSubCommand( targetB );
 		putIntInSubCommand( targetA );
@@ -303,9 +311,8 @@ public class MCBMiniSerialManager {
 		if( request_response ){
 			command_byte |= 0x80;
 		}
-
 		// Otherwise if we are sending a non request for response packet
-		if( !request_response ){
+		else{
 			if( command.datasize == null ){
 				throw new RuntimeException("Cannot send this command to boards with a value "+command);
 			}

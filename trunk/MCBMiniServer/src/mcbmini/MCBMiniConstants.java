@@ -1,10 +1,10 @@
 /* Description and License
- * MCBMini is a complete, open-source, flexible and scalable 
- * motor control scheme with board designs, firmware and host 
- * software. 
+ * MCBMini is a complete, open-source, flexible and scalable
+ * motor control scheme with board designs, firmware and host
+ * software.
  * This is the host software for MCBMini called MCBMiniServer
  * The MCBMini project can be downloaded from:
- * http://code.google.com/p/mcbmini/ 
+ * http://code.google.com/p/mcbmini/
  *
  * (c) Sigurdur Orn Adalgeirsson (siggi@alum.mit.edu)
  *
@@ -23,7 +23,7 @@
  * Free Software Foundation, Inc., 59 Temple Place, Suite 330,
  * Boston, MA  02111-1307  USA
  */
- 
+
  package mcbmini;
 
 import java.util.HashMap;
@@ -78,7 +78,10 @@ public interface MCBMiniConstants {
 		EXTRA_PIN_MODE			( Command.EXTRA_PIN_MODE, true ),
 		EXTRA_PIN_VALUE			( Command.EXTRA_PIN_VALUE, false ),
 
-		STREAM_MODE				( Command.STREAM_MODE, true );
+		STREAM_MODE				( Command.STREAM_MODE, true ),
+
+		ACTUAL_POT				( Command.POT_VALUE, false ),
+		ACTUAL_ENCODER			( Command.ENCODER_VALUE, false );
 
 		public Command command;
 		public boolean forward_to_board_on_change;
@@ -174,7 +177,17 @@ public interface MCBMiniConstants {
 		VEL_DOWNSCALE					( 39 , DataSize.U08 ),		// Helps provide more resolution in the PID parameters
 		MAX_ACCELERATION				( 40 , DataSize.S32 ),		// Sets the maximum increase in velocity between updates
 		VEL_TIME_DELTA					( 41 , DataSize.U08 ),		// Sets across how many updates the velocity (tick difference) should be calculated
-		STREAM_MODE						( 42 , DataSize.U08 );		// Sets whether we are streaming positions or not
+		STREAM_MODE						( 42 , DataSize.U08 ),		// Sets whether we are streaming positions or not
+
+		 // For V4.3 this is >= 17
+		TWO_TARGET_TICK_POT				( 43 , DataSize.S32 ),		// This command sets the target positions for both channels and requests specifically the current pot value back
+		TWO_TARGET_TICK_ENCODER			( 44 , DataSize.S32 ),		// This command sets the target positions for both channels and requests specifically the current encoder value back
+
+		TWO_TARGET_TICK_TWO_ACTUAL			( 45 , DataSize.S32 ),		// This command sets the target positions for both channels and requests the current actual value back for both channels
+		TWO_TARGET_TICK_TWO_VELOCITY		( 46 , DataSize.S32 ),		// This command sets the target positions for both channels and requests the current velocity back for both channels
+		TWO_TARGET_TICK_TWO_MOTOR_CURRENT	( 47 , DataSize.S32 ),		// This command sets the target positions for both channels and requests the electrical motor current value back for both channels
+		TWO_TARGET_TICK_TWO_POT				( 48 , DataSize.S32 ),		// This command sets the target positions for both channels and requests the potentiometer value back for both channels
+		TWO_TARGET_TICK_TWO_ENCODER			( 49 , DataSize.S32 );		// This command sets the target positions for both channels and requests the encoder value back for both channels
 
 		public final byte command;
 		public final DataSize datasize;

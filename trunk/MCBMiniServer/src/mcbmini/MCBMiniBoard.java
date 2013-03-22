@@ -1,10 +1,10 @@
 /* Description and License
- * MCBMini is a complete, open-source, flexible and scalable 
- * motor control scheme with board designs, firmware and host 
- * software. 
+ * MCBMini is a complete, open-source, flexible and scalable
+ * motor control scheme with board designs, firmware and host
+ * software.
  * This is the host software for MCBMini called MCBMiniServer
  * The MCBMini project can be downloaded from:
- * http://code.google.com/p/mcbmini/ 
+ * http://code.google.com/p/mcbmini/
  *
  * (c) Sigurdur Orn Adalgeirsson (siggi@alum.mit.edu)
  *
@@ -23,7 +23,7 @@
  * Free Software Foundation, Inc., 59 Temple Place, Suite 330,
  * Boston, MA  02111-1307  USA
  */
- 
+
  package mcbmini;
 
 import java.util.EnumMap;
@@ -205,6 +205,9 @@ public class MCBMiniBoard {
 
 	public boolean getEnabled(Channel channel){ return getChannelParameter(channel, ChannelParameter.ENABLED)==1; }
 	public void setEnabled(Channel channel, boolean value){ setChannelParameter(channel, ChannelParameter.ENABLED, value?1:0); }
+
+	public int getActualPotentiometerValue(Channel channel){ return getChannelParameter(channel, ChannelParameter.ACTUAL_POT); }
+	public int getActualEncoderValue(Channel channel){ return getChannelParameter(channel, ChannelParameter.ACTUAL_ENCODER); }
 
 	/**
 	 * This method returns the set of parameters that need to be updated to a board

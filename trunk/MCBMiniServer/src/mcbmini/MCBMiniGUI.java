@@ -185,7 +185,7 @@ public class MCBMiniGUI {
 				}
 			}
 		}
-		
+
 		if( !debug && MCBMiniNativeLoader.shouldLookForNative() && MCBMiniNativeLoader.findLibraryLocation() == null ){
 			error("Can't find native libraries, make sure that the jar is next to the \"lib\" folder");
 			System.exit(0);
@@ -214,7 +214,7 @@ public class MCBMiniGUI {
 			xml_file = fc.getSelectedFile().getAbsolutePath();
 		}
 
-		
+
 		XMLResults xml_results = null;
 		try {
 			xml_results = XMLUtils.parseMCBMiniConfigFile(xml_file);
@@ -425,6 +425,9 @@ public class MCBMiniGUI {
 	private long time_start = -1;
 	private long update_counter = 0;
 	public void update(){
+
+		System.out.println( server.getBoards().get(0).getActualPotentiometerValue(Channel.A) );
+
 		update_counter++;
 		if(time_start == -1)
 			time_start = System.currentTimeMillis();

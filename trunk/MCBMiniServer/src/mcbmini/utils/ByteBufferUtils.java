@@ -1,10 +1,10 @@
 /* Description and License
- * MCBMini is a complete, open-source, flexible and scalable 
- * motor control scheme with board designs, firmware and host 
- * software. 
+ * MCBMini is a complete, open-source, flexible and scalable
+ * motor control scheme with board designs, firmware and host
+ * software.
  * This is the host software for MCBMini called MCBMiniServer
  * The MCBMini project can be downloaded from:
- * http://code.google.com/p/mcbmini/ 
+ * http://code.google.com/p/mcbmini/
  *
  * (c) Sigurdur Orn Adalgeirsson (siggi@alum.mit.edu)
  *
@@ -26,7 +26,6 @@
 
 package mcbmini.utils;
 
-
 import java.nio.ByteBuffer;
 
 public class ByteBufferUtils {
@@ -38,59 +37,15 @@ public class ByteBufferUtils {
 	}
 
 	public static int getIntFromBack(ByteBuffer bb){
-		byte hh = bb.get(bb.limit()-4);
-		byte hl = bb.get(bb.limit()-3);
-		byte lh = bb.get(bb.limit()-2);
-		byte ll = bb.get(bb.limit()-1);
+		int val = bb.getInt(bb.limit()-4);
 		bb.limit(bb.limit()-4);
-
-		return assembleS32(ll, lh, hl, hh);
-	}
-
-	public static int getIntFromBackReversed(ByteBuffer bb){
-		byte hh = bb.get(bb.limit()-1);
-		byte hl = bb.get(bb.limit()-2);
-		byte lh = bb.get(bb.limit()-3);
-		byte ll = bb.get(bb.limit()-4);
-		bb.limit(bb.limit()-4);
-
-		return assembleS32(ll, lh, hl, hh);
-	}
-
-
-	public static void writeUnsignedShort(int value, ByteBuffer bb){
-		if( value < 0 || value >= 65536  ){
-			System.err.println("Value can not be converted into unsigned short");
-			return;
-		}
-		bb.put( (byte)((value>>8)&0xff) );
-		bb.put( (byte)((value)&0xff) );
-	}
-
-	public static int readUnsignedShort(ByteBuffer bb){
-		int h = (int)bb.get()&0xff;
-		int l = (int)bb.get()&0xff;
-		return h*256+l;
+		return val;
 	}
 
 	public static int readByteAsInt(ByteBuffer bb){
 		byte b = bb.get();
 		return (int)(b&0xff);
 	}
-
-//
-//	public static int readS16(ByteBuffer bb){
-//		byte h = bb.get();
-//		byte l = bb.get();
-//
-//		return
-//	}
-
-	public static int assembleS32(byte ll, byte lh, byte hl, byte hh){
-		int ret = ((hh & 0x000000FF) << 24) + ((hl & 0x000000FF) << 16) + ((lh & 0x000000FF) << 8) + (ll & 0x000000FF);
-		return ret;
-	}
-
 
 	public static String byteBufferToString(ByteBuffer bb){
 		String ret = "";
