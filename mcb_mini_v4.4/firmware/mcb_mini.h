@@ -426,6 +426,14 @@ static uint8_t buffer_data3[BUFFER_SIZE];
 #define CMD_VEL_TIME_DELTA					41
 #define CMD_STREAM_MODE						42
 
+#define CMD_2TARGET_TICK_POT				43
+#define CMD_2TARGET_TICK_ENCODER			44
+
+#define CMD_2TARGET_TICK_2ACTUAL			45
+#define CMD_2TARGET_TICK_2VELOCITY			46
+#define CMD_2TARGET_TICK_2MOTOR_CURRENT		47
+#define CMD_2TARGET_TICK_2POT				48
+#define CMD_2TARGET_TICK_2ENCODER			49
 
 /*
  * Error messages

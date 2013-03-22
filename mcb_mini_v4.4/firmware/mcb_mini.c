@@ -588,43 +588,15 @@ void processPackageBuffer(){
 	switch( cmd ){
 
 	case CMD_2TARGET_TICK_ACTUAL:
-		for(new_val=0; new_val<2; new_val++){
-			new_target = readIntFromEndReversed(package_buf);
-			if( new_target != LONG_MAX ){
-				circBufferPutLong(&controller[new_val].target_buffer, new_target);
-			}
-			if( controller[new_val].initialized == 0 && controller[new_val].notified_initialized == 0 ) {
-				addMessage1( CMD_ERROR, new_val, ERROR_UNINITIALIZED);
-				controller[new_val].notified_initialized = 1;
-			}
-		}
-
-		if( controller[channel].feedback_mode == FEEDBACK_MODE_POT ){
-			addIntToTxBufferReversed(motor[channel].actual_pot);
-		}
-		else{
-			addIntToTxBufferReversed( motor[channel].actual_enc );
-		}
-		addCMDByteToTxBuffer(cmd);
-		break;
-
 	case CMD_2TARGET_TICK_MOTOR_CURRENT:
-		for(new_val=0; new_val<2; new_val++){
-			new_target = readIntFromEndReversed(package_buf);
-			if( new_target != LONG_MAX ){
-				circBufferPutLong(&controller[new_val].target_buffer, new_target);
-			}
-			if( controller[new_val].initialized == 0 && controller[new_val].notified_initialized == 0 ) {
-				addMessage1( CMD_ERROR, new_val, ERROR_UNINITIALIZED);
-				controller[new_val].notified_initialized = 1;
-			}
-		}
-
-		addIntToTxBufferReversed(motor[channel].motor_current);
-		addCMDByteToTxBuffer(cmd);
-		break;
-
 	case CMD_2TARGET_TICK_VELOCITY:
+	case CMD_2TARGET_TICK_POT:
+	case CMD_2TARGET_TICK_ENCODER:
+	case CMD_2TARGET_TICK_2ACTUAL:
+	case CMD_2TARGET_TICK_2VELOCITY:
+	case CMD_2TARGET_TICK_2MOTOR_CURRENT:
+	case CMD_2TARGET_TICK_2POT:
+	case CMD_2TARGET_TICK_2ENCODER:
 		for(new_val=0; new_val<2; new_val++){
 			new_target = readIntFromEndReversed(package_buf);
 			if( new_target != LONG_MAX ){
@@ -636,7 +608,54 @@ void processPackageBuffer(){
 			}
 		}
 
-		addIntToTxBufferReversed(controller[channel].actual_tick_diff);
+		switch( cmd ){
+		case CMD_2TARGET_TICK_ACTUAL:
+			if( controller[channel].feedback_mode == FEEDBACK_MODE_POT ){
+				addIntToTxBufferReversed(motor[channel].actual_pot);
+			}
+			else{
+				addIntToTxBufferReversed( motor[channel].actual_enc );
+			}
+			break;
+		case CMD_2TARGET_TICK_2ACTUAL:
+			if( controller[channel].feedback_mode == FEEDBACK_MODE_POT ){
+				addIntToTxBufferReversed(motor[1].actual_pot);
+				addIntToTxBufferReversed(motor[0].actual_pot);
+			}
+			else{
+				addIntToTxBufferReversed( motor[1].actual_enc );
+				addIntToTxBufferReversed( motor[0].actual_enc );
+			}
+			break;
+		case CMD_2TARGET_TICK_2VELOCITY:
+			addIntToTxBufferReversed(controller[1].actual_tick_diff);
+			addIntToTxBufferReversed(controller[0].actual_tick_diff);
+			break;
+		case CMD_2TARGET_TICK_2MOTOR_CURRENT:
+			addIntToTxBufferReversed(motor[1].motor_current);
+			addIntToTxBufferReversed(motor[0].motor_current);
+			break;
+		case CMD_2TARGET_TICK_2POT:
+			addIntToTxBufferReversed(motor[1].actual_pot);
+			addIntToTxBufferReversed(motor[0].actual_pot);
+			break;
+		case CMD_2TARGET_TICK_2ENCODER:
+			addIntToTxBufferReversed(motor[1].actual_enc);
+			addIntToTxBufferReversed(motor[0].actual_enc);
+			break;
+		case CMD_2TARGET_TICK_MOTOR_CURRENT:
+			addIntToTxBufferReversed(motor[channel].motor_current);
+			break;
+		case CMD_2TARGET_TICK_VELOCITY:
+			addIntToTxBufferReversed(controller[channel].actual_tick_diff);
+			break;
+		case CMD_2TARGET_TICK_POT:
+			addIntToTxBufferReversed(motor[channel].actual_pot);
+			break;
+		case CMD_2TARGET_TICK_ENCODER:
+			addIntToTxBufferReversed(motor[channel].actual_enc);
+			break;
+		}
 		addCMDByteToTxBuffer(cmd);
 		break;
 
