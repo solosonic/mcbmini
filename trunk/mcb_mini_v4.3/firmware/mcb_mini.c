@@ -1,27 +1,27 @@
 /*
  * This file is part of the MCBMini firmware.
- * MCBMini is a complete, open-source, flexible and scalable 
- * motor control scheme with board designs, firmware and host 
- * software. 
+ * MCBMini is a complete, open-source, flexible and scalable
+ * motor control scheme with board designs, firmware and host
+ * software.
  * This is the firmware for MCBMini
  * The MCBMini project can be downloaded from:
- * http://code.google.com/p/mcbmini/ 
+ * http://code.google.com/p/mcbmini/
  *
  * (c) Sigurdur Orn Adalgeirsson (siggi@alum.mit.edu)
  *
  * MCBMini firmware is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, version 2 of the License
- * 
+ *
  * MCBMini firmware is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU General Public License
  * along with the MCBMini firmware.  If not, see <http://www.gnu.org/licenses/>.
  */
- 
+
 // MCBMini
 //
 // Version:	4.3
@@ -31,7 +31,7 @@
 // Date:	10 Dec. '12
 //
 
-#define FIRMWARE_VERSION 	16
+#define FIRMWARE_VERSION 	17
 
 #include "circBuffer.h"
 
@@ -528,43 +528,15 @@ void processPackageBuffer(){
 	switch( cmd ){
 
 	case CMD_2TARGET_TICK_ACTUAL:
-		for(new_val=0; new_val<2; new_val++){
-			new_target = readIntFromEndReversed(package_buf);
-			if( new_target != LONG_MAX ){
-				circBufferPutLong(&controller[new_val].target_buffer, new_target);
-			}
-			if( controller[new_val].initialized == 0 && controller[new_val].notified_initialized == 0 ) {
-				addMessage1( CMD_ERROR, new_val, ERROR_UNINITIALIZED);
-				controller[new_val].notified_initialized = 1;
-			}
-		}
-
-		if( controller[channel].feedback_mode == FEEDBACK_MODE_POT ){
-			addIntToTxBufferReversed(motor[channel].actual_pot);
-		}
-		else{
-			addIntToTxBufferReversed( motor[channel].actual_enc );
-		}
-		addCMDByteToTxBuffer(cmd);
-		break;
-
 	case CMD_2TARGET_TICK_MOTOR_CURRENT:
-		for(new_val=0; new_val<2; new_val++){
-			new_target = readIntFromEndReversed(package_buf);
-			if( new_target != LONG_MAX ){
-				circBufferPutLong(&controller[new_val].target_buffer, new_target);
-			}
-			if( controller[new_val].initialized == 0 && controller[new_val].notified_initialized == 0 ) {
-				addMessage1( CMD_ERROR, new_val, ERROR_UNINITIALIZED);
-				controller[new_val].notified_initialized = 1;
-			}
-		}
-
-		addIntToTxBufferReversed(motor[channel].motor_current);
-		addCMDByteToTxBuffer(cmd);
-		break;
-
 	case CMD_2TARGET_TICK_VELOCITY:
+	case CMD_2TARGET_TICK_POT:
+	case CMD_2TARGET_TICK_ENCODER:
+	case CMD_2TARGET_TICK_2ACTUAL:
+	case CMD_2TARGET_TICK_2VELOCITY:
+	case CMD_2TARGET_TICK_2MOTOR_CURRENT:
+	case CMD_2TARGET_TICK_2POT:
+	case CMD_2TARGET_TICK_2ENCODER:
 		for(new_val=0; new_val<2; new_val++){
 			new_target = readIntFromEndReversed(package_buf);
 			if( new_target != LONG_MAX ){
@@ -576,7 +548,54 @@ void processPackageBuffer(){
 			}
 		}
 
-		addIntToTxBufferReversed(controller[channel].actual_tick_diff);
+		switch( cmd ){
+		case CMD_2TARGET_TICK_ACTUAL:
+			if( controller[channel].feedback_mode == FEEDBACK_MODE_POT ){
+				addIntToTxBufferReversed(motor[channel].actual_pot);
+			}
+			else{
+				addIntToTxBufferReversed( motor[channel].actual_enc );
+			}
+			break;
+		case CMD_2TARGET_TICK_2ACTUAL:
+			if( controller[channel].feedback_mode == FEEDBACK_MODE_POT ){
+				addIntToTxBufferReversed(motor[1].actual_pot);
+				addIntToTxBufferReversed(motor[0].actual_pot);
+			}
+			else{
+				addIntToTxBufferReversed( motor[1].actual_enc );
+				addIntToTxBufferReversed( motor[0].actual_enc );
+			}
+			break;
+		case CMD_2TARGET_TICK_2VELOCITY:
+			addIntToTxBufferReversed(controller[1].actual_tick_diff);
+			addIntToTxBufferReversed(controller[0].actual_tick_diff);
+			break;
+		case CMD_2TARGET_TICK_2MOTOR_CURRENT:
+			addIntToTxBufferReversed(motor[1].motor_current);
+			addIntToTxBufferReversed(motor[0].motor_current);
+			break;
+		case CMD_2TARGET_TICK_2POT:
+			addIntToTxBufferReversed(motor[1].actual_pot);
+			addIntToTxBufferReversed(motor[0].actual_pot);
+			break;
+		case CMD_2TARGET_TICK_2ENCODER:
+			addIntToTxBufferReversed(motor[1].actual_enc);
+			addIntToTxBufferReversed(motor[0].actual_enc);
+			break;
+		case CMD_2TARGET_TICK_MOTOR_CURRENT:
+			addIntToTxBufferReversed(motor[channel].motor_current);
+			break;
+		case CMD_2TARGET_TICK_VELOCITY:
+			addIntToTxBufferReversed(controller[channel].actual_tick_diff);
+			break;
+		case CMD_2TARGET_TICK_POT:
+			addIntToTxBufferReversed(motor[channel].actual_pot);
+			break;
+		case CMD_2TARGET_TICK_ENCODER:
+			addIntToTxBufferReversed(motor[channel].actual_enc);
+			break;
+		}
 		addCMDByteToTxBuffer(cmd);
 		break;
 
