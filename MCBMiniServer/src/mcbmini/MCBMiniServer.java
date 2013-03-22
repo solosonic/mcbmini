@@ -1,10 +1,10 @@
 /* Description and License
- * MCBMini is a complete, open-source, flexible and scalable 
- * motor control scheme with board designs, firmware and host 
- * software. 
+ * MCBMini is a complete, open-source, flexible and scalable
+ * motor control scheme with board designs, firmware and host
+ * software.
  * This is the host software for MCBMini called MCBMiniServer
  * The MCBMini project can be downloaded from:
- * http://code.google.com/p/mcbmini/ 
+ * http://code.google.com/p/mcbmini/
  *
  * (c) Sigurdur Orn Adalgeirsson (siggi@alum.mit.edu)
  *
@@ -23,7 +23,7 @@
  * Free Software Foundation, Inc., 59 Temple Place, Suite 330,
  * Boston, MA  02111-1307  USA
  */
- 
+
 package mcbmini;
 
 import java.awt.event.ActionEvent;
@@ -51,7 +51,7 @@ import mcbmini.MCBMiniConstants.DataSize;
 import mcbmini.MCBMiniConstants.Error;
 import mcbmini.MCBMiniConstants.ExtraPinMode;
 import mcbmini.MCBMiniConstants.Id;
-import mcbmini.MCBMiniSerialManager.FeedbackType;
+import mcbmini.MCBMiniSerialManager.ResponseType;
 import mcbmini.utils.ByteBufferUtils;
 import mcbmini.utils.FramerateMonitor;
 
@@ -67,7 +67,7 @@ public class MCBMiniServer{
 	private static final double server_version = 1.0;
 
 	private static final double minimum_config_file_version = 1.0;
-	
+
 	public static double getServerVersion(){
 		return server_version;
 	}
@@ -91,7 +91,6 @@ public class MCBMiniServer{
 	protected int minimum_firmware_version = 16;
 
 	private static final float DEFAULT_UPDATE_RATE = 50f;
-	private static final int GET_MOTOR_CURRENT_RATE_DIVISOR = 10;
 
 	private static final int BAUD_RATE = 115200;
 
@@ -133,6 +132,9 @@ public class MCBMiniServer{
 
 	private List<Request> incoming_requests;
 
+	private static final Channel[] CHANNELS = Channel.values();
+
+	private ResponseType[] response_types;
 
 	private List<MCBMiniBoardDisabledHandler> board_disable_event_handlers;
 	private List<BoardDisabledEvent> board_disable_events;
@@ -146,8 +148,6 @@ public class MCBMiniServer{
 
 	private FramerateMonitor internal_upd_fm = new FramerateMonitor(2);
 	private FramerateMonitor all_board_upd_fm = new FramerateMonitor(2);
-
-	private Channel current_feedback_channel;
 
 	public enum FaultHandlingPolicy {DO_NOTHING, RE_ENABLE};
 
@@ -209,6 +209,8 @@ public class MCBMiniServer{
 		for (MCBMiniBoard board : boards) {
 			board_id_to_board_map.put(Integer.valueOf(board.getId()), board);
 		}
+
+		response_types = createResponseTypes();
 
 		/*
 		 * This will set the sleep granularity to 1ms for some reason
@@ -280,8 +282,6 @@ public class MCBMiniServer{
 		t2.setPriority(Thread.MAX_PRIORITY);
 		t2.start();
 
-		current_feedback_channel = Channel.A;
-
 		/*
 		 * Start by sending all the boards an empty message, this could clear out the RX buffers (and flush bad checksums)
 		 */
@@ -306,7 +306,18 @@ public class MCBMiniServer{
 			sendRequestForResponse(board, Channel.A, Command.FIRMWARE_VERSION, new FirmwareCheckingResponseHandler());
 		}
 	}
-	
+
+	protected ResponseType[] createResponseTypes(){
+		 return new ResponseType[]{
+					ResponseType.ACTUAL_TICK_TWO,
+					ResponseType.ACTUAL_TICK_TWO,
+					ResponseType.ACTUAL_TICK_TWO,
+					ResponseType.ACTUAL_TICK_TWO,
+					ResponseType.ACTUAL_TICK_TWO,
+					ResponseType.MOTOR_CURRENT_TWO,
+				};
+	}
+
 	public int getMinimumFirmwareVersion(){
 		return this.minimum_firmware_version;
 	}
@@ -350,8 +361,8 @@ public class MCBMiniServer{
 	/**
 	 * This method gets called at the update rate of the controllers from within the update thread
 	 */
-	private long internal_update_counter = 0;
-	private long responses_within_update_counter = 0;
+	private int internal_update_counter = 0;
+	private int responses_within_update_counter = 0;
 	private void internalUpdate(){
 		responses_within_update_counter = 0;
 		internal_update_counter++;
@@ -412,12 +423,10 @@ public class MCBMiniServer{
 		 */
 
 		// Alternate feedback from the two channels of all boards
-		if( current_feedback_channel == Channel.A ) current_feedback_channel = Channel.B;
-		else current_feedback_channel = Channel.A;
+		Channel response_channel = CHANNELS[ internal_update_counter % 2 ];
 
 		// Every Xth time, we get electric current information instead of position feedback
-		boolean should_get_currents = (internal_update_counter%GET_MOTOR_CURRENT_RATE_DIVISOR == 0) || (internal_update_counter%(GET_MOTOR_CURRENT_RATE_DIVISOR+1) == 0);
-		FeedbackType feedback_type = should_get_currents ? FeedbackType.MOTOR_CURRENT : FeedbackType.ACTUAL_TICK ;
+		ResponseType response_type = response_types[ internal_update_counter % response_types.length ];
 
 		/*
 		 * For older firmware we just stream positions all the time
@@ -436,17 +445,17 @@ public class MCBMiniServer{
 				if( target_B == null ) target_B = Integer.MAX_VALUE;
 			}
 
-			ser_manager.writeSpecializedPacket(board, feedback_type, current_feedback_channel, false, target_A, target_B);
+			ser_manager.writeSpecializedPacket(board, response_type, response_channel, target_A, target_B);
 
 			/*
 			 * Here we handle the Extra pin functionality
 			 */
-			ExtraPinMode extraPinMode = board.getExtraPinMode(current_feedback_channel);
+			ExtraPinMode extraPinMode = board.getExtraPinMode(response_channel);
 			if( extraPinMode == ExtraPinMode.ANALOG ){
-				ser_manager.writeGenericPacket(board, current_feedback_channel, Command.EXTRA_PIN_VALUE, true, 0);
+				ser_manager.writeGenericPacket(board, response_channel, Command.EXTRA_PIN_VALUE, true, 0);
 			}
 			else if( extraPinMode == ExtraPinMode.SERVO ){
-				ser_manager.writeGenericPacket(board, current_feedback_channel, Command.EXTRA_PIN_VALUE, false, board.getExtraPinValue(current_feedback_channel));
+				ser_manager.writeGenericPacket(board, response_channel, Command.EXTRA_PIN_VALUE, false, board.getExtraPinValue(response_channel));
 			}
 		}
 
@@ -673,24 +682,46 @@ public class MCBMiniServer{
 
 		// If this is a response to our target pos special then just put current data into the motor objects
 		if( command == Command.TWO_TARGET_TICK_ACTUAL || command == Command.TWO_TARGET_TICK_VELOCITY ){
-			board.setChannelParameter(ch, ChannelParameter.ACTUAL_TICK,  ByteBufferUtils.getIntFromBackReversed(bb) );
+			board.setChannelParameter(ch, ChannelParameter.ACTUAL_TICK,  ByteBufferUtils.getIntFromBack(bb) );
+		}
+		else if( command == Command.TWO_TARGET_TICK_TWO_ACTUAL || command == Command.TWO_TARGET_TICK_TWO_VELOCITY ){
+			board.setChannelParameter(Channel.A, ChannelParameter.ACTUAL_TICK,  ByteBufferUtils.getIntFromBack(bb) );
+			board.setChannelParameter(Channel.B, ChannelParameter.ACTUAL_TICK,  ByteBufferUtils.getIntFromBack(bb) );
+		}
+		else if( command == Command.TWO_TARGET_TICK_TWO_ENCODER ){
+			board.setChannelParameter(Channel.A, ChannelParameter.ACTUAL_ENCODER,  ByteBufferUtils.getIntFromBack(bb) );
+			board.setChannelParameter(Channel.B, ChannelParameter.ACTUAL_ENCODER,  ByteBufferUtils.getIntFromBack(bb) );
+		}
+		else if( command == Command.TWO_TARGET_TICK_TWO_POT ){
+			board.setChannelParameter(Channel.A, ChannelParameter.ACTUAL_POT,  ByteBufferUtils.getIntFromBack(bb) );
+			board.setChannelParameter(Channel.B, ChannelParameter.ACTUAL_POT,  ByteBufferUtils.getIntFromBack(bb) );
+		}
+		else if( command == Command.TWO_TARGET_TICK_TWO_MOTOR_CURRENT ){
+			board.setChannelParameter(Channel.A, ChannelParameter.MOTOR_CURRENT,  ByteBufferUtils.getIntFromBack(bb) );
+			board.setChannelParameter(Channel.B, ChannelParameter.MOTOR_CURRENT,  ByteBufferUtils.getIntFromBack(bb) );
 		}
 		// If this is a response to our target pos special then just put current data into the motor objects
 		else if( command == Command.TWO_TARGET_TICK_MOTOR_CURRENT ){
-			board.setChannelParameter(ch, ChannelParameter.MOTOR_CURRENT,  ByteBufferUtils.getIntFromBackReversed(bb) );
+			board.setChannelParameter(ch, ChannelParameter.MOTOR_CURRENT,  ByteBufferUtils.getIntFromBack(bb) );
+		}
+		else if( command == Command.TWO_TARGET_TICK_ENCODER ){
+			board.setChannelParameter(ch, ChannelParameter.ACTUAL_ENCODER,  ByteBufferUtils.getIntFromBack(bb) );
+		}
+		else if( command == Command.TWO_TARGET_TICK_POT ){
+			board.setChannelParameter(ch, ChannelParameter.ACTUAL_POT,  ByteBufferUtils.getIntFromBack(bb) );
 		}
 		else if( command == Command.ACTUAL_TICK ){
-			handler_value = ByteBufferUtils.getIntFromBackReversed(bb);
+			handler_value = ByteBufferUtils.getIntFromBack(bb);
 			board.setChannelParameter(ch, ChannelParameter.ACTUAL_TICK, handler_value );
 		}
 		// If it is a the value of our extra pin (switch or analog)
 		else if( command == Command.EXTRA_PIN_VALUE ){
-			handler_value = ByteBufferUtils.getIntFromBackReversed(bb);
+			handler_value = ByteBufferUtils.getIntFromBack(bb);
 			board.setChannelParameter(ch, ChannelParameter.EXTRA_PIN_VALUE, handler_value );
 		}
 		// If it is a simple empty response to let us know that the board is active, do nothing
 		else if( command == Command.DEBUG ){
-			int debug_val = ByteBufferUtils.getIntFromBackReversed(bb);
+			int debug_val = ByteBufferUtils.getIntFromBack(bb);
 			System.out.println("Debug message from board "+id+" channel "+ch+" :"+debug_val);
 		}
 		// If it is a simple empty response to let us know that the board is active, do nothing
@@ -823,7 +854,7 @@ public class MCBMiniServer{
 		else{
 			// Read the appropriate amount of bytes from the buffer and put it in its place
 			if( command.datasize == DataSize.U08 && bb.remaining() > 0 ) 		handler_value = ByteBufferUtils.getFromBack(bb) & 0xff;
-			else if( command.datasize == DataSize.S32 && bb.remaining() > 3 ) 	handler_value = ByteBufferUtils.getIntFromBackReversed(bb);
+			else if( command.datasize == DataSize.S32 && bb.remaining() > 3 ) 	handler_value = ByteBufferUtils.getIntFromBack(bb);
 			else{
 				System.err.println("Received response with command that doesn't have data size specified");
 			}
