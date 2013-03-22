@@ -422,18 +422,9 @@ public class MCBMiniGUI {
 		return server;
 	}
 
-	private long time_start = -1;
 	private long update_counter = 0;
 	public void update(){
-
-		System.out.println( server.getBoards().get(0).getActualPotentiometerValue(Channel.A) );
-
 		update_counter++;
-		if(time_start == -1)
-			time_start = System.currentTimeMillis();
-
-		float current_time = (float)(System.currentTimeMillis()-time_start)/1000f;
-
 
 		/*
 		 * Update sliders
