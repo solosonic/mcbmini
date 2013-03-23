@@ -72,7 +72,7 @@ public class ByteBufferUtils {
 		for(int i=0; i<how_many; i++){
 			System.out.print((int)(bb.get(i)&0xff) + " ");
 		}
-		System.out.println(" ");
+		Log.println(" ");
 	}
 
 	public static byte calcChecksum(ByteBuffer bb){
@@ -85,7 +85,7 @@ public class ByteBufferUtils {
 	public static void printByteArray(byte[] array, int cnt){
 		for(int i=0; i<cnt; i++)
 			System.out.print(unsignedByte2int(array[i])+" ");
-		System.out.println(" ");
+		Log.println(" ");
 
 	}
 

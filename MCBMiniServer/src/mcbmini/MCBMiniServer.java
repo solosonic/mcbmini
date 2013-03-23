@@ -54,6 +54,7 @@ import mcbmini.MCBMiniConstants.Id;
 import mcbmini.MCBMiniSerialManager.ResponseType;
 import mcbmini.utils.ByteBufferUtils;
 import mcbmini.utils.FramerateMonitor;
+import mcbmini.utils.Log;
 
 import org.jdom.Element;
 
@@ -98,7 +99,7 @@ public class MCBMiniServer{
 		public abstract void handleResponse(MCBMiniBoard board, Channel channel, Command command, int value);
 
 		public void handleTimeout(MCBMiniBoard board, Channel channel, Command command){
-			System.err.println("TIMEOUT while waiting for response from board: "+board.getId()+", channel: "+channel+", command: "+command);
+			Log.println("TIMEOUT while waiting for response from board: "+board.getId()+", channel: "+channel+", command: "+command, true);
 		}
 	}
 
@@ -106,7 +107,7 @@ public class MCBMiniServer{
 		public abstract void handleIDResponse(int board_id);
 
 		public void handleTimeout(int board_id){
-			System.err.println("TIMEOUT while waiting for ID response");
+			Log.println("TIMEOUT while waiting for ID response", true);
 		}
 	}
 
@@ -196,7 +197,7 @@ public class MCBMiniServer{
 		this.ser_manager = serial_manager;
 
 		if(ser_manager == null){
-			System.out.println("Can't instantiate serial manager for mcbminiserver");
+			Log.println("Can't instantiate serial manager for mcbminiserver");
 			System.exit(0);
 		}
 
@@ -306,12 +307,13 @@ public class MCBMiniServer{
 		 */
 		board_firmware_response_count = 0;
 		lowest_reported_firmware_version = Integer.MAX_VALUE;
-		System.out.print("Waiting for all boards to report their firmware, IDs: ");
+
 		for (MCBMiniBoard board : boards) {
 			sendRequestForResponse(board, Channel.A, Command.FIRMWARE_VERSION, new FirmwareCheckingResponseHandler());
 		}
-		for (int i=0; i<boards.size()-1; i++) System.out.print(boards.get(i).getId()+", ");
-		System.out.println(boards.get(boards.size()-1).getId()+":");
+		String str = "Waiting for all boards to report their firmware, IDs: ";
+		for (int i=0; i<boards.size()-1; i++) str += boards.get(i).getId()+", ";
+		Log.println(str+boards.get(boards.size()-1).getId()+":");
 	}
 
 	protected ResponseType[] createResponseTypes(){
@@ -403,7 +405,7 @@ public class MCBMiniServer{
 			if( cur_time - last_check_for_timeouts_ms > 1000 ){
 				for (MCBMiniBoard board : boards) {
 					if( cur_time - board.last_received_message_ms  > 500 ){
-						System.out.println("No response from board ID: "+board.getId());
+						Log.println("No response from board ID: "+board.getId());
 						board.increaseErrorCount(Error.NO_RESPONSE);
 					}
 				}
@@ -605,7 +607,7 @@ public class MCBMiniServer{
 
 				//				// If nobody handled this message then we have a problem because nobody registered for it
 				//				if( !handled ){
-				//					System.out.println("ERROR: received response from board "+req.board.getId()+" but no handler was subscribed to it ("+req.command+")");
+				//					Log.println("ERROR: received response from board "+req.board.getId()+" but no handler was subscribed to it ("+req.command+")");
 				//				}
 				i.remove();
 			}
@@ -668,7 +670,7 @@ public class MCBMiniServer{
 		int handler_value = Integer.MAX_VALUE;
 
 		if(bb.limit()-bb.position()<1){
-			System.out.println("Weird, got small bb. pos:"+bb.position()+" lim:"+bb.limit()+" cap:"+bb.capacity());
+			Log.println("Weird, got small bb. pos:"+bb.position()+" lim:"+bb.limit()+" cap:"+bb.capacity());
 		}
 		int id = ByteBufferUtils.getFromBack(bb) & 0xff;
 		Channel ch = ((id >> 7) & 0x01)==0 ? Channel.A : Channel.B;		// Here we pick out the channel bit
@@ -682,13 +684,13 @@ public class MCBMiniServer{
 		MCBMiniBoard board = board_id_to_board_map.get( id );
 
 		if( board == null && command != Command.ID ){
-			System.out.println("Received response "+command+" from board id "+id+" that is not in our list, ignoring");
+			Log.println("Received response "+command+" from board id "+id+" that is not in our list, ignoring");
 			return;
 		}
 
 		if( board != null ) board.last_received_message_ms = System.currentTimeMillis();
 
-		if( DEBUG ) System.out.println("Received from id "+id+" command: "+command+" channel "+ ch);
+		if( DEBUG ) Log.println("Received from id "+id+" command: "+command+" channel "+ ch);
 
 		// If this board has a message to give us then we request to get it
 		if( has_message && board != null){
@@ -743,14 +745,14 @@ public class MCBMiniServer{
 		// If it is a simple empty response to let us know that the board is active, do nothing
 		else if( command == Command.DEBUG ){
 			int debug_val = ByteBufferUtils.getIntFromBack(bb);
-			System.out.println("Debug message from board "+id+" channel "+ch+" :"+debug_val);
+			Log.println("Debug message from board "+id+" channel "+ch+" :"+debug_val);
 		}
 		// If it is a simple empty response to let us know that the board is active, do nothing
 		else if( command == Command.EMPTY_RESPONSE ){
 			;
 		}
 		else if( command == null ){
-			System.out.println("Received unknown command with CMD byte: "+cmd_byte);
+			Log.println("Received unknown command with CMD byte: "+cmd_byte);
 		}
 		/*
 		 * Here we handle all kinds of errors from the boards
@@ -759,7 +761,7 @@ public class MCBMiniServer{
 			// This is an error condition that occurs sometimes (especially on dragonbot) and it usually means that the robot is trying to notify fault but has problems
 			int error_code;
 			if( bb.remaining() == 0 ){
-				System.err.println("Error code missing, assuming that it was a fault message");
+				Log.println("Error code missing, assuming that it was a fault message", true);
 				error_code = Error.FAULT.id;
 			}
 			else{
@@ -767,15 +769,15 @@ public class MCBMiniServer{
 			}
 
 			Error error = Error.getForId( error_code );
-			System.err.print("Received error message from board: "+board.getId()+" : "+error+" ");
+			Log.println("Error/Warning from board: "+board.getId()+" : "+error+" ", true);
 
 			if( error == null ){
-				System.err.println("\nError message not recognized");
+				Log.println("\nError message not recognized", true);
 			}
 			else{
 				if( error == Error.BAD_CMD_RCV ){
 					int bad_command = ByteBufferUtils.getFromBack(bb) & 0xff;
-					System.err.print(" => "+bad_command + " : " + Command.getForCmdId(bad_command));
+					Log.println(" => "+bad_command + " : " + Command.getForCmdId(bad_command), true);
 				}
 				else if( error == Error.FAULT ){
 					switch( fault_handling_policy ){
@@ -788,11 +790,11 @@ public class MCBMiniServer{
 					case RE_ENABLE:
 						if( board.getEnabled(Channel.A) ){
 							sendRequest(board, Channel.A, Command.ENABLE, 1);
-							System.err.println("\nRe-enabling channel A");
+							Log.println("\nRe-enabling channel A", true);
 						}
 						if( board.getEnabled(Channel.B) ){
 							sendRequest(board, Channel.B, Command.ENABLE, 1);
-							System.err.println("\nRe-enabling channel B");
+							Log.println("\nRe-enabling channel B", true);
 						}
 						break;
 					default:
@@ -802,7 +804,7 @@ public class MCBMiniServer{
 				else if( error == Error.PARAM_DUR_EN ){
 					board.setChannelParameter(ch, ChannelParameter.ENABLED, 0);
 
-					System.out.println("\nParameters set while bridge is enabled, bridge was disabled as a result");
+					Log.println("\nParameters set while bridge is enabled, bridge was disabled as a result", true);
 
 					// Notify about the disable
 					synchronized (board_disable_event_handlers) {
@@ -822,13 +824,13 @@ public class MCBMiniServer{
 
 				// This happens when the motorboard hears the first packet ever, lets us know if it gets reset
 				else if( error == Error.UNINITIALIZED ){
-					System.err.println("\nBoard: "+board.getId()+", channel "+ch+" says it is uninitialized");
-					System.err.println("\tServer responding by sending/resending parameters");
+					Log.println("\nBoard: "+board.getId()+", channel "+ch+" says it is uninitialized", true);
+					Log.println("\tServer responding by sending/resending parameters", true);
 					if( SHOULD_RESEND_LAST_ENABLED_VALUE_ON_BOARD_RESET ){
-						System.out.println("\tAlso sending last known enabled value for channel "+ch+" : "+board.getChannelParameter(ch, ChannelParameter.ENABLED));
+						Log.println("\tAlso sending last known enabled value for channel "+ch+" : "+board.getChannelParameter(ch, ChannelParameter.ENABLED));
 					}
 					else{
-						System.err.println("\tSetting channel to DISABLED");
+						Log.println("\tSetting channel to DISABLED", true);
 						// Notify about the disable
 						synchronized (board_disable_event_handlers) {
 							if( board.getChannelParameter(ch, ChannelParameter.ENABLED) == 1 ) board_disable_events.add( new BoardDisabledEvent(board, ch) );
@@ -839,23 +841,23 @@ public class MCBMiniServer{
 					if( SHOULD_RESEND_LAST_KNOWN_TICKS_ON_BOARD_RESET ){
 						if( board.getChannelParameter(ch, ChannelParameter.FEEDBACK_MODE) == 0){
 							int tick = board.getChannelParameter(ch, ChannelParameter.ACTUAL_TICK);
-							System.err.println("\tAlso sending offset of last known encoder value for channel "+ch+" : "+tick);
+							Log.println("\tAlso sending offset of last known encoder value for channel "+ch+" : "+tick, true);
 							sendRequest(board, ch, Command.ACTUAL_ENCODER_OFFSET, tick);
 						}
 					}
 					board.clearParametersInUse(ch);
 				}
 				else if( error == Error.MSG_BUF_OVF ){
-					System.err.println("Assuming a fault message was in msg buffer queue");
+					Log.println("Assuming a fault message was in msg buffer queue", true);
 					// This assumes that the message that should have been sent to us was a fault message
 					if( fault_handling_policy == FaultHandlingPolicy.RE_ENABLE ){
 						if( board.getEnabled(Channel.A) ){
 							sendRequest(board, Channel.A, Command.ENABLE, 1);
-							System.err.println("\nRe-enabling channel A");
+							Log.println("\nRe-enabling channel A", true);
 						}
 						if( board.getEnabled(Channel.B) ){
 							sendRequest(board, Channel.B, Command.ENABLE, 1);
-							System.err.println("\nRe-enabling channel B");
+							Log.println("\nRe-enabling channel B", true);
 						}
 					}
 				}
@@ -866,7 +868,6 @@ public class MCBMiniServer{
 				else{
 					board.increaseErrorCount(error);
 				}
-				System.err.println();
 			}
 		}
 		/*
@@ -877,7 +878,7 @@ public class MCBMiniServer{
 			if( command.datasize == DataSize.U08 && bb.remaining() > 0 ) 		handler_value = ByteBufferUtils.getFromBack(bb) & 0xff;
 			else if( command.datasize == DataSize.S32 && bb.remaining() > 3 ) 	handler_value = ByteBufferUtils.getIntFromBack(bb);
 			else{
-				System.err.println("Received response with command that doesn't have data size specified");
+				Log.println("Received response with command that doesn't have data size specified", true);
 			}
 		}
 
@@ -964,15 +965,15 @@ public class MCBMiniServer{
 		public void handleResponse(MCBMiniBoard board, Channel channel, Command command, int value) {
 			board_firmware_response_count++;
 			lowest_reported_firmware_version = Math.min(lowest_reported_firmware_version, value);
-			System.out.println("Motorboard "+board.getId()+" reports firmware version: "+value);
+			Log.println("Motorboard "+board.getId()+" reports firmware version: "+value);
 			if( value < minimum_firmware_version ){
-				System.err.println("This version of the server can only talk to boards of firmware version "+minimum_firmware_version+" and higher. Board "+board.getId()+" reports "+value);
+				Log.println("This version of the server can only talk to boards of firmware version "+minimum_firmware_version+" and higher. Board "+board.getId()+" reports "+value, true);
 				new RuntimeException().printStackTrace();
 				System.exit(0);
 			}
 
 			if( board_firmware_response_count == boards.size() ){
-				System.out.println("All boards have reported their firmware, lowest firmware version: "+lowest_reported_firmware_version);
+				Log.println("All boards have reported their firmware, lowest firmware version: "+lowest_reported_firmware_version);
 				response_types = createResponseTypes();
 				board_firmware_has_been_confirmed = true;
 			}

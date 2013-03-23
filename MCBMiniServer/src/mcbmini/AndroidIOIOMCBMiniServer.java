@@ -1,10 +1,10 @@
 /* Description and License
- * MCBMini is a complete, open-source, flexible and scalable 
- * motor control scheme with board designs, firmware and host 
- * software. 
+ * MCBMini is a complete, open-source, flexible and scalable
+ * motor control scheme with board designs, firmware and host
+ * software.
  * This is the host software for MCBMini called MCBMiniServer
  * The MCBMini project can be downloaded from:
- * http://code.google.com/p/mcbmini/ 
+ * http://code.google.com/p/mcbmini/
  *
  * (c) Sigurdur Orn Adalgeirsson (siggi@alum.mit.edu)
  *
@@ -23,7 +23,7 @@
  * Free Software Foundation, Inc., 59 Temple Place, Suite 330,
  * Boston, MA  02111-1307  USA
  */
- 
+
  package mcbmini;
 
  /**
@@ -37,6 +37,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 import mcbmini.serial.iSerial;
+import mcbmini.utils.Log;
 
 public class AndroidIOIOMCBMiniServer extends MCBMiniServer {
 
@@ -46,7 +47,7 @@ public class AndroidIOIOMCBMiniServer extends MCBMiniServer {
 	}
 
 	private static MCBMiniSerialManager createMCBMiniSerialManager(int ioio_rx_pin, int ioio_tx_pin){
-		System.out.println("IOIO call: AndroidIOIOMCBMiniServer");
+		Log.println("IOIO call: AndroidIOIOMCBMiniServer");
 		iSerial ser = new AndroidIOIOPSerial(ioio_rx_pin, ioio_tx_pin);
 
 		int cnt = 0;
@@ -54,7 +55,7 @@ public class AndroidIOIOMCBMiniServer extends MCBMiniServer {
 			try {
 				Thread.sleep(10);
 				if (cnt++ > 500) {
-					System.out.println("Timeout waiting for the IOIO");
+					Log.println("Timeout waiting for the IOIO");
 					throw new RuntimeException("Timeout in waiting for the IOIO serial initialization");
 				}
 			} catch (InterruptedException e) {

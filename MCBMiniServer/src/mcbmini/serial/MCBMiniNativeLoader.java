@@ -28,6 +28,8 @@ package mcbmini.serial;
 
 import java.io.File;
 
+import mcbmini.utils.Log;
+
 /**
  * @author siggi
  * @date Jul 18, 2012
@@ -51,14 +53,14 @@ public class MCBMiniNativeLoader {
 				System.load(lib_path);
 				return;
 			}
-			System.err.println("MCBMiniNativeLoader: Tried searching for native library in lib folder, didn't find it");
-			System.err.println("Attempting regular library loading");
+			Log.println("MCBMiniNativeLoader: Tried searching for native library in lib folder, didn't find it", true);
+			Log.println("Attempting regular library loading", true);
 
 			try{
 				System.loadLibrary("rxtxSerial");
 			} catch(java.lang.UnsatisfiedLinkError error){
-				System.err.println("MCBMiniNativeLoader: Can't load native rxtx libraries");
-				System.err.println(error.getMessage());
+				Log.println("MCBMiniNativeLoader: Can't load native rxtx libraries", true);
+				Log.println(error.getMessage(), true);
 				System.exit(0);
 			}
 		}
@@ -95,7 +97,7 @@ public class MCBMiniNativeLoader {
 				os_libname = "librxtxSerial.so";
 			}
 			else{
-				System.err.println("Can't find native libraries for your OS");
+				Log.println("Can't find native libraries for your OS", true);
 				return null;
 			}
 

@@ -1,10 +1,10 @@
 /* Description and License
- * MCBMini is a complete, open-source, flexible and scalable 
- * motor control scheme with board designs, firmware and host 
- * software. 
+ * MCBMini is a complete, open-source, flexible and scalable
+ * motor control scheme with board designs, firmware and host
+ * software.
  * This is the host software for MCBMini called MCBMiniServer
  * The MCBMini project can be downloaded from:
- * http://code.google.com/p/mcbmini/ 
+ * http://code.google.com/p/mcbmini/
  *
  * (c) Sigurdur Orn Adalgeirsson (siggi@alum.mit.edu)
  *
@@ -38,6 +38,7 @@ import mcbmini.MCBMiniServer;
 import mcbmini.MCBMiniServer.MCBMiniBoardDisabledHandler;
 import mcbmini.MCBMiniServer.MCBMiniResponseHandler;
 import mcbmini.serial.MCBMiniNativeLoader;
+import mcbmini.utils.Log;
 import mcbmini.utils.XMLUtils;
 import mcbmini.utils.XMLUtils.XMLResults;
 
@@ -67,7 +68,7 @@ public class Example {
 		try {
 			results = XMLUtils.parseMCBMiniConfigFile( args[0] );
 		} catch (Exception e1) {
-			System.err.println("Can't parse input file: "+e1.getMessage());
+			Log.println("Can't parse input file: "+e1.getMessage(), true);
 			System.exit(0);
 		}
 
@@ -99,7 +100,7 @@ public class Example {
 		server.addBoardDisabledEventHandler(new MCBMiniBoardDisabledHandler() {
 			@Override
 			public void handleBoardDisableEvent(MCBMiniBoard board, Channel ch) {
-				System.out.println("Board notified disable event: "+board.getId()+": "+ch);
+				Log.println("Board notified disable event: "+board.getId()+": "+ch);
 			}
 		});
 
@@ -120,14 +121,14 @@ public class Example {
 			board.setTargetTick(Channel.A, sin);
 
 			// Print out the actual tick position for the motor
-			System.out.println("Actual tick: " + board.getActualTick(Channel.A) );
+			Log.println("Actual tick: " + board.getActualTick(Channel.A) );
 
 			// Every now and then make a request for a parameter just for fun
 			if( index % 200 == 0 ){
 				server.sendRequestForResponse(board, Channel.A, Command.MOTOR_CURRENT, new MCBMiniResponseHandler() {
 					@Override
 					public void handleResponse(MCBMiniBoard board, Channel channel, Command command, int value) {
-						System.out.println("Received response to request: "+command+": "+value);
+						Log.println("Received response to request: "+command+": "+value);
 					}
 				});
 			}
@@ -138,8 +139,8 @@ public class Example {
 			 */
 			if( index % 100 == 0 ){
 				float[] fps = server.getUpdateRates(null);
-				System.out.println("Internal update rate: "+fps[0]+" Hz");
-				System.out.println("Board cycle update rate: "+fps[1]+" Hz");
+				Log.println("Internal update rate: "+fps[0]+" Hz");
+				Log.println("Board cycle update rate: "+fps[1]+" Hz");
 			}
 
 			// Sleep to set the update frequency

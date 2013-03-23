@@ -54,7 +54,7 @@ public class BluetoothSetup {
 			String[] avalable_ports = PSerial.list();
 
 			for (String string : avalable_ports) {
-				System.out.println(string);
+				Log.println(string);
 				if( string.contains("FireFly") ){
 					port = string;
 					break;
@@ -74,7 +74,7 @@ public class BluetoothSetup {
 		 * an exception.
 		 */
 
-		System.out.println("Starting serial....");
+		Log.println("Starting serial....");
 		try {
 			ser = new PSerial( port, 115200);
 		} catch (IOException e) {
@@ -82,7 +82,7 @@ public class BluetoothSetup {
 			e.printStackTrace();
 			System.exit(0);
 		}
-		System.out.println("Done!");
+		Log.println("Done!");
 
 		/*
 		 * This is good coding practice but might be unneccesary as the serial library might
@@ -96,8 +96,8 @@ public class BluetoothSetup {
 			}
 		}));
 
-		System.out.println("This should happen in the within 60 seconds of you bluetooth device starting up");
-		System.out.println("");
+		Log.println("This should happen in the within 60 seconds of you bluetooth device starting up");
+		Log.println("");
 
 		Timer t = new Timer(20, new ActionListener() {
 
@@ -116,13 +116,13 @@ public class BluetoothSetup {
 
 					// Do something with the received buffer
 					reply = new String(received);
-					System.out.println("BlueSmirf replied: " + reply);
+					Log.println("BlueSmirf replied: " + reply);
 				}
 
 				try {
 
 					if( stage == 0 ){
-						System.out.println("Start CMD mode...");
+						Log.println("Start CMD mode...");
 						byte[] bla = getBytesForString("$$$");
 						ser.write( bla );
 						reply = "";
@@ -130,7 +130,7 @@ public class BluetoothSetup {
 					}
 
 					else if(stage == 1 && reply.contains("CMD")){
-						System.out.println("Set in 115.2K baud rate mode...");
+						Log.println("Set in 115.2K baud rate mode...");
 						byte[] bla = getBytesForString("SU,11\r");
 						ser.write( bla );
 						reply = "";
@@ -138,7 +138,7 @@ public class BluetoothSetup {
 					}
 
 					else if(stage == 2 && reply.contains("AOK")){
-						System.out.println("End CMD mode...");
+						Log.println("End CMD mode...");
 						byte[] bla = getBytesForString("---\r");
 						ser.write( bla );
 						reply = "";
@@ -146,7 +146,7 @@ public class BluetoothSetup {
 					}
 
 					else if(stage == 3 && reply.contains("END")){
-						System.out.println("Done...");
+						Log.println("Done...");
 						System.exit(0);
 					}
 				}

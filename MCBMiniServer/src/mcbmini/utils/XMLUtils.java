@@ -1,10 +1,10 @@
 /* Description and License
- * MCBMini is a complete, open-source, flexible and scalable 
- * motor control scheme with board designs, firmware and host 
- * software. 
+ * MCBMini is a complete, open-source, flexible and scalable
+ * motor control scheme with board designs, firmware and host
+ * software.
  * This is the host software for MCBMini called MCBMiniServer
  * The MCBMini project can be downloaded from:
- * http://code.google.com/p/mcbmini/ 
+ * http://code.google.com/p/mcbmini/
  *
  * (c) Sigurdur Orn Adalgeirsson (siggi@alum.mit.edu)
  *
@@ -82,8 +82,8 @@ public class XMLUtils {
 			e.printStackTrace();
 		}
 
-		
-		
+
+
 		return root;
 	}
 
@@ -114,8 +114,8 @@ public class XMLUtils {
 		}
 		else{
 			xml_version = 1.0; // This is the version number for the modern XML format that just hasn't got the "version" flag yet
-		}		
-		
+		}
+
 		res.port_name = getOptional(root, "port");
 		res.boards = new ArrayList<MCBMiniBoard>();
 
@@ -128,12 +128,12 @@ public class XMLUtils {
 
 		// Here we do a quick test to check if an outdated configuration file is being used (created before versioning numbers)
 		if( miniBoards.size() > 0 ){
-			Element first_board = miniBoards.get(0);	
+			Element first_board = miniBoards.get(0);
 			if( first_board.getChild("Channels") != null && first_board.getChild("Channels").getChild("Motor") != null &&  first_board.getChild("Channels").getChild("Motor").getChild("pgain") != null ){
 				xml_version = 0.1;
 			}
 		}
-		System.out.println("MCBMini: Parsing configuration file \""+path+"\" of version: "+xml_version);
+		Log.println("MCBMini: Parsing configuration file \""+path+"\" of version: "+xml_version);
 
 		if( xml_version < MCBMiniServer.getMinimumConfigFileVersion() ){
 			throw new RuntimeException("MCBMini: Config file is outdated, please upgrade to a more modern version. This version of MCBMiniServer requires a minimum version number of: "+MCBMiniServer.getMinimumConfigFileVersion());
