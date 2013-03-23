@@ -469,6 +469,12 @@ public class MCBMiniServer{
 				}
 			}
 		}
+		// Otherwise we just send empty packets
+		else{
+			for (MCBMiniBoard board : boards) {
+				ser_manager.writeGenericPacket(board, CHANNELS[ internal_update_counter % 2 ], Command.EMPTY_RESPONSE, false, 0);
+			}
+		}
 
 		/*
 		 * Now we see if we need to forward any requests
