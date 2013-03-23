@@ -107,14 +107,16 @@ int main(void){
 		TCNT0 = 0;
 
 		// Check to see if we have a comm timeout
-		// Happens if we get no data over comm for a whole second
-		if( timeout_timer > 100 &&  timeout_timer != 255 ){
+		// Happens if we get no data over comm for about 2.5 seconds
+		if( timeout_timer > 250 &&  timeout_timer != 255 ){
 			controller[0].enable = ENABLE_OFF;
 			controller[1].enable = ENABLE_OFF;
 			addMessage1(CMD_ERROR, 0, ERROR_TIMEOUT_DISABLE);
 			timeout_timer = 255;	// Set it to a fixed value so that this only happens once
 		}
-		if( timeout_timer != 255 ){
+
+		// Only start timer when either board has been initialized
+		if( timeout_timer != 255 && (controller[0].initialized || controller[1].initialized) ){
 			timeout_timer++;
 		}
 
