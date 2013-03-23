@@ -1,27 +1,27 @@
 /*
  * This file is part of the MCBMini firmware.
- * MCBMini is a complete, open-source, flexible and scalable 
- * motor control scheme with board designs, firmware and host 
- * software. 
+ * MCBMini is a complete, open-source, flexible and scalable
+ * motor control scheme with board designs, firmware and host
+ * software.
  * This is the firmware for MCBMini
  * The MCBMini project can be downloaded from:
- * http://code.google.com/p/mcbmini/ 
+ * http://code.google.com/p/mcbmini/
  *
  * (c) Sigurdur Orn Adalgeirsson (siggi@alum.mit.edu)
  *
  * MCBMini firmware is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, version 2 of the License
- * 
+ *
  * MCBMini firmware is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU General Public License
  * along with the MCBMini firmware.  If not, see <http://www.gnu.org/licenses/>.
  */
- 
+
 // MCBMini
 //
 // Version:	4.4
@@ -112,16 +112,15 @@ int main(void){
 		TCNT0 = 0;
 
 		// Check to see if we have a comm timeout
-		if( timeout_timer > 100 &&  timeout_timer != 255 ){
+		if( timeout_timer > 250 &&  timeout_timer != 255 ){
 			controller[0].enable = ENABLE_OFF;
 			controller[1].enable = ENABLE_OFF;
 			addMessage1(CMD_ERROR, 0, ERROR_TIMEOUT_DISABLE);
 			timeout_timer = 255;	// Set it to a fixed value so that this only happens once
-			if( rx_have_received_package == 1 ){
-				changeLEDMode( LED_MODE_PULSE_1 );
-			}
 		}
-		if( timeout_timer != 255 ){
+
+		// Only start timer when either board has been initialized
+		if( timeout_timer != 255 && (controller[0].initialized || controller[1].initialized) ){
 			timeout_timer++;
 		}
 
