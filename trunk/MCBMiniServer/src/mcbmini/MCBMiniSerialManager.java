@@ -44,6 +44,7 @@ import mcbmini.MCBMiniConstants.Id;
 import mcbmini.serial.PSerial;
 import mcbmini.serial.iSerial;
 import mcbmini.utils.ByteBufferUtils;
+import mcbmini.utils.Log;
 
 
 /**
@@ -116,7 +117,7 @@ public class MCBMiniSerialManager {
 			byte in = ser.readByte();
 
 			if( PRINT_RX_BYTES ){
-				System.err.println("Received byte "+(in&0xff));
+				Log.println("Received byte "+(in&0xff), true);
 			}
 
 			// We might have a ready packet !
@@ -138,7 +139,7 @@ public class MCBMiniSerialManager {
 					packet.flip();
 
 					if( packet.limit() < 2  ){
-						System.err.println("Error, every packet needs to be at least 2 values for id and command");
+						Log.println("Error, every packet needs to be at least 2 values for id and command", true);
 						ByteBufferUtils.printByteBuffer(packet, packet.limit());
 					}
 					else{
@@ -152,7 +153,7 @@ public class MCBMiniSerialManager {
 					 * This caused some trouble some times
 					 */
 
-					System.out.println("Packet with bad checksum received ! accumulated: "+ByteBufferUtils.byte2int(checksum)+", received: "+ByteBufferUtils.byte2int(checksum_rcv));
+					Log.println("Packet with bad checksum received ! accumulated: "+ByteBufferUtils.byte2int(checksum)+", received: "+ByteBufferUtils.byte2int(checksum_rcv));
 					ByteBufferUtils.printByteBuffer(read_bb, read_bb.position());
 					bad_checksum_received_counter++;
 				}
@@ -206,11 +207,11 @@ public class MCBMiniSerialManager {
 		temp_buffer.put(HEADER_BYTE);
 
 		if( DEBUG ){
-			System.err.print("Writing out bytes: ");
+			String str = "Writing out bytes: ";
 			for (int i = 0; i < temp_buffer.position(); i++) {
-				System.err.print(ByteBufferUtils.byte2int( temp_buffer.get(i) ) + ", ");
+				str += ByteBufferUtils.byte2int( temp_buffer.get(i) ) + ", ";
 			}
-			System.err.println();
+			Log.println(str, true);
 		}
 
 		// Pad with zeros because of slave bus contention issues
@@ -301,9 +302,9 @@ public class MCBMiniSerialManager {
 
 		if(DEBUG){
 			if( board != null )
-				System.err.println("Sending command "+ByteBufferUtils.byte2int(command.command)+" to board "+board.getId()+" channel "+channel);
+				Log.println("Sending command "+ByteBufferUtils.byte2int(command.command)+" to board "+board.getId()+" channel "+channel, true);
 			else
-				System.err.println("Sending command "+ByteBufferUtils.byte2int(command.command)+" to all boards  channel "+channel);
+				Log.println("Sending command "+ByteBufferUtils.byte2int(command.command)+" to all boards  channel "+channel, true);
 		}
 
 

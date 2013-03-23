@@ -64,6 +64,7 @@ import mcbmini.MCBMiniServer.MCBMiniIDResponseHandler;
 import mcbmini.MCBMiniServer.MCBMiniResponseHandler;
 import mcbmini.plotting.PlottingWindow;
 import mcbmini.serial.MCBMiniNativeLoader;
+import mcbmini.utils.Log;
 import mcbmini.utils.RunningAvgFilter;
 import mcbmini.utils.XMLUtils;
 import mcbmini.utils.XMLUtils.XMLResults;
@@ -106,17 +107,17 @@ public class MCBMiniGUI {
 	private static MCBMiniServer server_instance;
 
 	private static void printHelp(){
-		System.out.println("Usage: java -jar MCBMini.jar [options]");
-		System.out.println("options:");
-		System.out.println("\t-help (printout this list of help options)");
-		System.out.println("\t-config config_file.xml (required)");
-		System.out.println("\t-debug (run without a serial connection)");
-		System.out.println("\t-port port_name (to override port in xml file)");
-		System.out.println("\t-lib path_to_lib (path to native rxtx libraries)");
+		Log.println("Usage: java -jar MCBMini.jar [options]");
+		Log.println("options:");
+		Log.println("\t-help (printout this list of help options)");
+		Log.println("\t-config config_file.xml (required)");
+		Log.println("\t-debug (run without a serial connection)");
+		Log.println("\t-port port_name (to override port in xml file)");
+		Log.println("\t-lib path_to_lib (path to native rxtx libraries)");
 	}
 
 	private static void error(String error){
-		System.err.println(error);
+		Log.println(error, true);
 		String[] options = new String[]{"OK"};
 		JOptionPane.showOptionDialog(null,
 			    error,
@@ -158,11 +159,11 @@ public class MCBMiniGUI {
 				}
 				if( args[i].equals("-debug") ){
 					debug = true;
-					System.out.println("Running in debug mode (without a serial connection)");
+					Log.println("Running in debug mode (without a serial connection)");
 				}
 				if( args[i].equals("-port") && args.length > i+1 ){
 					port_name = args[i+1];
-					System.out.println("Overriding port name in config file with: "+port_name);
+					Log.println("Overriding port name in config file with: "+port_name);
 				}
 				if( args[i].equals("-config") && args.length > i+1 ){
 					if( new File(args[i+1]).exists() ) xml_file = args[i+1];
@@ -177,11 +178,11 @@ public class MCBMiniGUI {
 					if( new File(args[i+1]).exists() ) lib_path = args[i+1];
 					else if( new File(System.getProperty("user.dir")+SEP+args[i+1]).exists() ) lib_path = System.getProperty("user.dir")+SEP+args[i+1];
 					else{
-						System.err.println("Library file \""+args[i+1]+"\" cannot be found");
+						Log.println("Library file \""+args[i+1]+"\" cannot be found", true);
 						System.exit(0);
 					}
 					System.setProperty("rxtx.library.path", lib_path);
-					System.out.println("Setting native rxtx library path to \""+lib_path+"\"");
+					Log.println("Setting native rxtx library path to \""+lib_path+"\"");
 				}
 			}
 		}
@@ -574,7 +575,7 @@ public class MCBMiniGUI {
 					server.sendRequestForResponse(board, channel, commands.get(combo.getSelectedIndex()), new MCBMiniResponseHandler() {
 						@Override
 						public void handleResponse(MCBMiniBoard board, Channel channel, Command command, int value) {
-							System.out.println("Received response: "+board.getId()+" "+channel+" "+command+" " +value);
+							Log.println("Received response: "+board.getId()+" "+channel+" "+command+" " +value);
 							result_ts.setText("Timestamp: "+(System.currentTimeMillis()-start));
 							result_id.setText("ID: "+board.getId());
 							result_channel.setText("Channel: "+channel);
@@ -805,7 +806,7 @@ public class MCBMiniGUI {
 
 				buttons[i].addActionListener(new ActionListener() {
 					public void actionPerformed(ActionEvent arg0) {
-						System.out.println("Sending parameters");
+						Log.println("Sending parameters");
 						Channel ch;
 						int ind;
 						if (arg0.getSource() == buttons[0]){

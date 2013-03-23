@@ -41,6 +41,8 @@ import java.util.Enumeration;
 import java.util.Properties;
 import java.util.Vector;
 
+import mcbmini.utils.Log;
+
 
 
 public class PSerial implements SerialPortEventListener, iSerial {
@@ -150,7 +152,7 @@ public class PSerial implements SerialPortEventListener, iSerial {
 					(CommPortIdentifier) portList.nextElement();
 
 				if (portId.getPortType() == CommPortIdentifier.PORT_SERIAL) {
-					//System.out.println("found " + portId.getName());
+					//Log.println("found " + portId.getName());
 					if (portId.getName().equals(iname)) {
 						port = (SerialPort)portId.open("serial madness", 2000);
 						input = port.getInputStream();
@@ -158,7 +160,7 @@ public class PSerial implements SerialPortEventListener, iSerial {
 						port.setSerialPortParams(rate, databits, stopbits, parity);
 						port.addEventListener(this);
 						port.notifyOnDataAvailable(true);
-						//System.out.println("opening, ready to roll");
+						//Log.println("opening, ready to roll");
 					}
 				}
 			}
@@ -527,9 +529,9 @@ public class PSerial implements SerialPortEventListener, iSerial {
 
 			int length = found - bufferIndex + 1;
 			if (length > outgoing.length) {
-				System.err.println("readBytesUntil() byte buffer is" +
+				Log.println("readBytesUntil() byte buffer is" +
 						" too small for the " + length +
-						" bytes up to and including char " + interesting);
+						" bytes up to and including char " + interesting, true);
 				return -1;
 			}
 			//byte outgoing[] = new byte[length];
@@ -630,7 +632,7 @@ public class PSerial implements SerialPortEventListener, iSerial {
 			//System.err.println("got port list");
 			while (portList.hasMoreElements()) {
 				CommPortIdentifier portId = (CommPortIdentifier) portList.nextElement();
-				System.out.println(portId);
+				Log.println(""+portId);
 
 				if (portId.getPortType() == CommPortIdentifier.PORT_SERIAL) {
 					String name = portId.getName();
@@ -672,7 +674,7 @@ public class PSerial implements SerialPortEventListener, iSerial {
 		String ret = null;
 		String[] list = PSerial.list();
 		for (String str : list) {
-			System.out.println("Found port with name: "+str);
+			Log.println("Found port with name: "+str);
 			if(str.toLowerCase().contains(part_of_name.toLowerCase())){
 				ret = str;
 			}
@@ -704,9 +706,9 @@ public class PSerial implements SerialPortEventListener, iSerial {
       CheckboxMenuItem item = (CheckboxMenuItem)e.getSource();
       item.setState(true);
       String name = item.getLabel();
-      //System.out.println(item.getLabel());
+      //Log.println(item.getLabel());
       PdeBase.properties.put("serial.port", name);
-      //System.out.println("set to " + get("serial.port"));
+      //Log.println("set to " + get("serial.port"));
     }
   }
  */
@@ -727,12 +729,12 @@ public class PSerial implements SerialPortEventListener, iSerial {
     // so it tends to be very fragile. i.e. quotes in the CLASSPATH
     // environment variable will hose things.
     try {
-      //System.out.println("building port list");
+      //Log.println("building port list");
       Enumeration portList = CommPortIdentifier.getPortIdentifiers();
       while (portList.hasMoreElements()) {
         CommPortIdentifier portId =
           (CommPortIdentifier) portList.nextElement();
-        //System.out.println(portId);
+        //Log.println(portId);
 
         if (portId.getPortType() == CommPortIdentifier.PORT_SERIAL) {
           //if (portId.getName().equals(port)) {
@@ -750,12 +752,12 @@ public class PSerial implements SerialPortEventListener, iSerial {
       problem = true;
 
     } catch (Exception e) {
-      System.out.println("exception building serial menu");
+      Log.println("exception building serial menu");
       e.printStackTrace();
     }
 
     //if (serialMenu.getItemCount() == 0) {
-      //System.out.println("dimming serial menu");
+      //Log.println("dimming serial menu");
     //serialMenu.setEnabled(false);
     //}
 
