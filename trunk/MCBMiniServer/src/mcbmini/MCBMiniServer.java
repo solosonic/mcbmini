@@ -52,6 +52,7 @@ import mcbmini.MCBMiniConstants.Error;
 import mcbmini.MCBMiniConstants.ExtraPinMode;
 import mcbmini.MCBMiniConstants.Id;
 import mcbmini.MCBMiniSerialManager.ResponseType;
+import mcbmini.functions.TargetFunction;
 import mcbmini.utils.ByteBufferUtils;
 import mcbmini.utils.FramerateMonitor;
 import mcbmini.utils.Log;
@@ -183,7 +184,7 @@ public class MCBMiniServer{
 		ArrayList<Integer> ids = new ArrayList<Integer>();
 		for (MCBMiniBoard board : boards) {
 			Integer id = Integer.valueOf(board.getId());
-			if( id < 0 || id > 125 ){
+			if( id < 0 || id > 126 ){
 				throw new RuntimeException("Invalid MCBMiniBoard ID! needs to be between 0 and 126");
 			}
 			if( ids.contains(id) ){
@@ -431,7 +432,6 @@ public class MCBMiniServer{
 			/*
 			 * Then we send updated positions and get positions and currents back
 			 */
-
 			// Alternate feedback from the two channels of all boards
 			Channel response_channel = CHANNELS[ internal_update_counter % 2 ];
 
@@ -442,6 +442,16 @@ public class MCBMiniServer{
 			 * For older firmware we just stream positions all the time
 			 */
 			for (MCBMiniBoard board : boards) {
+				/*
+				 * Here we check to see if either channel has an active target function, if so then we apply its value
+				 */
+				for (Channel channel : Channel.values()) {
+					board.applyTargetFunction(channel);
+				}
+
+				/*
+				 * Now we apply the
+				 */
 				Integer target_A, target_B;
 				if( minimum_firmware_version < 16 ){
 					target_A = board.getTargetTick(Channel.A);

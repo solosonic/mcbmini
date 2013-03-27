@@ -39,6 +39,7 @@ import mcbmini.MCBMiniConstants.ExtraPinMode;
 import mcbmini.MCBMiniConstants.FeedbackMode;
 import mcbmini.MCBMiniConstants.MotorPolarity;
 import mcbmini.MCBMiniConstants.ControlMode;
+import mcbmini.functions.TargetFunction;
 
 /**
  * @author siggi
@@ -50,6 +51,8 @@ public class MCBMiniBoard {
 	private boolean[] params_dirty;
 	private boolean[] fresh_target;
 
+	private TargetFunction[] target_functions;
+
 	private EnumMap<ChannelParameter, Integer>[] params;
 	private EnumMap<ChannelParameter, Integer>[] params_in_use;
 	private EnumMap<Command, Integer> commands_in_use;
@@ -60,7 +63,7 @@ public class MCBMiniBoard {
 
 	public MCBMiniBoard(int id){
 		if( id < 0 || id > 126 ){
-			throw new IllegalArgumentException("Id needs to be within 0 and 126");
+			throw new IllegalArgumentException("Id needs to be within 0 and 127");
 		}
 
 		this.id = id;
@@ -69,6 +72,8 @@ public class MCBMiniBoard {
 		commands_in_use = new EnumMap<Command, Integer>( Command.class );
 		fresh_target = new boolean[2];
 		error_counts = new EnumMap[2];
+
+		target_functions = new TargetFunction[2];
 
 		params_dirty = new boolean[2];
 
@@ -128,6 +133,29 @@ public class MCBMiniBoard {
 	protected synchronized int getChannelBParameter(ChannelParameter param){ return getChannelParameter(Channel.B, param); }
 
 	/*
+	 * Target function related stuff
+	 */
+	public void setTargetFunction(Channel channel, TargetFunction function){
+		if( function != null ){
+			function.setOwner(this, channel);
+			function.initialize();
+		}
+		this.target_functions[ channel.index ] = function;
+	}
+
+	public TargetFunction getTargetFunction(Channel channel){
+		return this.target_functions[ channel.index ];
+	}
+
+	public void applyTargetFunction(Channel channel){
+		TargetFunction targetFunction = target_functions[channel.index];
+		if( targetFunction != null ){
+			params[channel.index].put(ChannelParameter.TARGET_TICK, targetFunction.applyFunction());
+			fresh_target[channel.index] = true;
+		}
+	}
+
+	/*
 	 * These are convenience methods to get/put parameters
 	 */
 	public int getPositionPGain(Channel channel){ return getChannelParameter(channel, ChannelParameter.POS_P_GAIN); }
@@ -164,7 +192,9 @@ public class MCBMiniBoard {
 	public void setMaxAcceleration(Channel channel, int value){ limitCheckLow(value, 0); setChannelParameter(channel, ChannelParameter.MAX_ACCELERATION, value); }
 
 	public int getTargetTick(Channel channel){ return getChannelParameter(channel, ChannelParameter.TARGET_TICK); }
+
 	public synchronized void setTargetTick(Channel channel, int value){
+		target_functions[channel.index] = null;	// If someone sets the target position manually, then we disable any function that might be in control
 		params[channel.index].put(ChannelParameter.TARGET_TICK, value);	// This is a bit faster
 		fresh_target[channel.index] = true;
 	}
