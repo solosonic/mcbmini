@@ -1,27 +1,27 @@
 /*
  * This file is part of the MCBMini firmware.
- * MCBMini is a complete, open-source, flexible and scalable 
- * motor control scheme with board designs, firmware and host 
- * software. 
+ * MCBMini is a complete, open-source, flexible and scalable
+ * motor control scheme with board designs, firmware and host
+ * software.
  * This is the firmware for MCBMini
  * The MCBMini project can be downloaded from:
- * http://code.google.com/p/mcbmini/ 
+ * http://code.google.com/p/mcbmini/
  *
  * (c) Sigurdur Orn Adalgeirsson (siggi@alum.mit.edu)
  *
  * MCBMini firmware is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, version 2 of the License
- * 
+ *
  * MCBMini firmware is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
- * 
+ *
  * You should have received a copy of the GNU General Public License
  * along with the MCBMini firmware.  If not, see <http://www.gnu.org/licenses/>.
  */
- 
+
  /*
  * mcb_mini.h
  *
@@ -296,6 +296,8 @@ uint8_t volatile tx_ready;
 
 uint32_t volatile loop_count = 0;
 
+uint8_t volatile pid_update_period = 195;	// Sets the update rate at around 100Hz
+
 /*
  * Settings variables for the motors
  */
@@ -313,7 +315,7 @@ static uint8_t actual_buffer_data_B[ACTUAL_BUFFER_SIZE];
 /*
  * a2d vars
  */
-#define A2D_ITERATIONS_DIV2 	3
+#define A2D_ITERATIONS_DIV2 	2
 #define A2D_ITERATIONS 			1<<A2D_ITERATIONS_DIV2		// Needs to be divisible by 2
 
 uint8_t volatile a2d_index;
@@ -434,6 +436,8 @@ static uint8_t buffer_data3[BUFFER_SIZE];
 #define CMD_2TARGET_TICK_2MOTOR_CURRENT		47
 #define CMD_2TARGET_TICK_2POT				48
 #define CMD_2TARGET_TICK_2ENCODER			49
+
+#define CMD_PID_UPDATE_PERIOD				50
 
 /*
  * Error messages
