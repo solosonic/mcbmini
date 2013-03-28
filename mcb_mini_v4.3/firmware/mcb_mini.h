@@ -252,7 +252,7 @@ uint8_t volatile tx_ready;
 
 uint32_t volatile loop_count = 0;
 
-uint32_t volatile pid_update_period = 195;	// Sets the update rate at around 100Hz
+uint8_t volatile pid_update_period = 195;	// Sets the update rate at around 100Hz
 
 /*
  * Settings variables for the motors

@@ -103,7 +103,7 @@ int main(void){
 					flag_should_change_id = 0;
 				}
 			}
-		} while( TCNT0 < pid_update_period );	// Sets the update right around 100Hz
+		} while( TCNT0 < pid_update_period );
 		TCNT0 = 0;
 
 		// Check to see if we have a comm timeout
@@ -938,11 +938,11 @@ void processPackageBuffer(){
 
 	case CMD_PID_UPDATE_PERIOD:
 		if( request_response==1 ){
-			addIntToTxBufferReversed( pid_update_period );
+			addByteToTxBuffer( pid_update_period );
 			addCMDByteToTxBuffer(cmd);
 		}
 		else{
-			pid_update_period = readIntFromEndReversed(package_buf);
+			pid_update_period = circBufferGetLast(package_buf);
 		}
 		break;
 
