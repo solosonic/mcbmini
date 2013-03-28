@@ -81,7 +81,9 @@ public interface MCBMiniConstants {
 		STREAM_MODE				( Command.STREAM_MODE, true ),
 
 		ACTUAL_POT				( Command.POT_VALUE, false ),
-		ACTUAL_ENCODER			( Command.ENCODER_VALUE, false );
+		ACTUAL_ENCODER			( Command.ENCODER_VALUE, false ),
+
+		PID_UPDATE_PERIOD		( Command.PID_UPDATE_PERIOD, true );
 
 		public Command command;
 		public boolean forward_to_board_on_change;
@@ -187,7 +189,10 @@ public interface MCBMiniConstants {
 		TWO_TARGET_TICK_TWO_VELOCITY		( 46 , DataSize.S32 ),		// This command sets the target positions for both channels and requests the current velocity back for both channels
 		TWO_TARGET_TICK_TWO_MOTOR_CURRENT	( 47 , DataSize.S32 ),		// This command sets the target positions for both channels and requests the electrical motor current value back for both channels
 		TWO_TARGET_TICK_TWO_POT				( 48 , DataSize.S32 ),		// This command sets the target positions for both channels and requests the potentiometer value back for both channels
-		TWO_TARGET_TICK_TWO_ENCODER			( 49 , DataSize.S32 );		// This command sets the target positions for both channels and requests the encoder value back for both channels
+		TWO_TARGET_TICK_TWO_ENCODER			( 49 , DataSize.S32 ),		// This command sets the target positions for both channels and requests the encoder value back for both channels
+
+		// This is for firmware versions > 17 for V4.4 and > 30 for V4.3
+		PID_UPDATE_PERIOD					( 50 , DataSize.S32 );		// This value sets the update rate of the PID (larger number, slower update rate) 195 is the default and is approximately 100Hz
 
 		public final byte command;
 		public final DataSize datasize;
