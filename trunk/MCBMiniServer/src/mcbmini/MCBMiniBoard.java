@@ -91,6 +91,9 @@ public class MCBMiniBoard {
 				params[channel.index].put(param, 0);
 			}
 
+			// Making sure that some parameters don't get synchronized unless an explicit value gets set externally
+			params_in_use[channel.index].put(ChannelParameter.PID_UPDATE_PERIOD, 0);
+
 			setPositionPGain(channel, 50);
 			setPositionDGain(channel, 20);
 			setPositionIGain(channel, 5);
@@ -131,6 +134,10 @@ public class MCBMiniBoard {
 	}
 	protected synchronized int getChannelAParameter(ChannelParameter param){ return getChannelParameter(Channel.A, param); }
 	protected synchronized int getChannelBParameter(ChannelParameter param){ return getChannelParameter(Channel.B, param); }
+
+	public void setPIDUpdatePeriod(int pid_update_period){
+		setChannelAParameter(ChannelParameter.PID_UPDATE_PERIOD, pid_update_period);
+	}
 
 	/*
 	 * Target function related stuff

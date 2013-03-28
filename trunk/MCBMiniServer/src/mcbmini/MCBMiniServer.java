@@ -379,6 +379,22 @@ public class MCBMiniServer{
 		return ser_manager.getNumberOfBadChecksums();
 	}
 
+	public void waitForServerInitialization(){
+		int count = 0;
+		while( !board_firmware_has_been_confirmed ){
+			update();
+			count++;
+
+			if( count > 100 ) throw new RuntimeException("Timeout while waiting for server to initialize, check to see if you have the right boards id's in the config file and actually connected to the bus");
+
+			try {
+				Thread.sleep(100);
+			} catch (InterruptedException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+		}
+	}
 
 	/**
 	 * This method gets called at the update rate of the controllers from within the update thread
@@ -450,7 +466,7 @@ public class MCBMiniServer{
 				}
 
 				/*
-				 * Now we apply the
+				 * Now we apply the actual positions
 				 */
 				Integer target_A, target_B;
 				if( minimum_firmware_version < 16 ){

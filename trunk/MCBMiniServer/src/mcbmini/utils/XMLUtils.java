@@ -162,6 +162,12 @@ public class XMLUtils {
 		List<Element> channels = board.getChild("Channels").getChildren();
 		boolean[] channels_done = new boolean[2];
 
+		String pid_update_str = getOptional(board, "pid_update_period");
+		if( pid_update_str != null ){
+			Integer pid_update = Integer.parseInt( pid_update_str );
+			miniBoard.setPIDUpdatePeriod(pid_update);
+		}
+
 		for(Element motor : channels){
 			MCBMiniConstants.Channel channel = getRequiredEnum(motor, "channel", MCBMiniConstants.Channel.values());
 			channels_done[channel.index] = true;
