@@ -136,6 +136,7 @@ public class MCBMiniBoard {
 	protected synchronized int getChannelBParameter(ChannelParameter param){ return getChannelParameter(Channel.B, param); }
 
 	public void setPIDUpdatePeriod(int pid_update_period){
+		limitCheck(pid_update_period, 0, 255);
 		setChannelAParameter(ChannelParameter.PID_UPDATE_PERIOD, pid_update_period);
 	}
 

@@ -192,7 +192,7 @@ public interface MCBMiniConstants {
 		TWO_TARGET_TICK_TWO_ENCODER			( 49 , DataSize.S32 ),		// This command sets the target positions for both channels and requests the encoder value back for both channels
 
 		// This is for firmware versions > 17 for V4.4 and > 30 for V4.3
-		PID_UPDATE_PERIOD					( 50 , DataSize.S32 );		// This value sets the update rate of the PID (larger number, slower update rate) 195 is the default and is approximately 100Hz
+		PID_UPDATE_PERIOD					( 50 , DataSize.U08 );		// This value sets the update rate of the PID (larger number, slower update rate) 195 is the default and is approximately 100Hz
 
 		public final byte command;
 		public final DataSize datasize;
