@@ -252,6 +252,7 @@ uint8_t volatile tx_ready;
 
 uint32_t volatile loop_count = 0;
 
+uint32_t volatile pid_update_period = 195;	// Sets the update rate at around 100Hz
 
 /*
  * Settings variables for the motors
@@ -270,8 +271,8 @@ static uint8_t actual_buffer_data_B[ACTUAL_BUFFER_SIZE];
 /*
  * a2d vars
  */
-#define A2D_ITERATIONS 16			// Needs to be divisible by 2
-#define A2D_ITERATIONS_DIV2 4		// This should satisfy 2^(A2D_ITERATIONS_DIV2) = A2D_ITERATIONS
+#define A2D_ITERATIONS 4			// Needs to be divisible by 2
+#define A2D_ITERATIONS_DIV2 2		// This should satisfy 2^(A2D_ITERATIONS_DIV2) = A2D_ITERATIONS
 
 uint8_t volatile a2d_index;
 uint8_t volatile a2d_counter;
@@ -381,6 +382,8 @@ int32_t volatile debug_msg1;
 #define CMD_2TARGET_TICK_2MOTOR_CURRENT		47
 #define CMD_2TARGET_TICK_2POT				48
 #define CMD_2TARGET_TICK_2ENCODER			49
+
+#define CMD_PID_UPDATE_PERIOD				50
 
 /*
  * Error messages
