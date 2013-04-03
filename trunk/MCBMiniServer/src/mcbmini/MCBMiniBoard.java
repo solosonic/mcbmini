@@ -88,11 +88,9 @@ public class MCBMiniBoard {
 			params_dirty[channel.index] = true;
 
 			for (ChannelParameter param : ChannelParameter.values()) {
-				params[channel.index].put(param, 0);
+				// Here we are marking some parameters that shouldn't be synchronized unless they get explicitly set with a setter method
+				params[channel.index].put(param, Integer.MAX_VALUE);
 			}
-
-			// Making sure that some parameters don't get synchronized unless an explicit value gets set externally
-			params_in_use[channel.index].put(ChannelParameter.PID_UPDATE_PERIOD, 0);
 
 			setPositionPGain(channel, 50);
 			setPositionDGain(channel, 20);
@@ -113,7 +111,6 @@ public class MCBMiniBoard {
 			setSlowEnableConstant(channel, 30);
 		}
 	}
-
 
 	/**
 	 * Sets any parameter of the board (including target positions)
@@ -261,7 +258,8 @@ public class MCBMiniBoard {
 		 * First we see which ones of the actual ChannelParams need to be updated
 		 */
 		for (Entry<ChannelParameter, Integer> entry : params[channel.index].entrySet()) {
-			if( !entry.getKey().forward_to_board_on_change ) continue;
+			// Skip parameters that shouldn't be forwarded on change and also parameters that haven't been set explicitly
+			if( !entry.getKey().forward_to_board_on_change || entry.getValue().equals( Integer.MAX_VALUE ) ) continue;
 
 			Integer val_in_use = params_in_use[channel.index].get( entry.getKey() );
 			if( val_in_use == null ) val_in_use = -1;
