@@ -31,7 +31,7 @@
 // Date:	13 des. '12
 //
 
-#define FIRMWARE_VERSION 	30
+#define FIRMWARE_VERSION 	31
 
 #include "circBuffer.h"
 #include "mcb_mini.h"
