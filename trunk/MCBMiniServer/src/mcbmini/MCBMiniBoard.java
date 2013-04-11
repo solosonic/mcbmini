@@ -92,6 +92,8 @@ public class MCBMiniBoard {
 				params[channel.index].put(param, Integer.MAX_VALUE);
 			}
 
+			setEnabled(channel, false);
+
 			setPositionPGain(channel, 50);
 			setPositionDGain(channel, 20);
 			setPositionIGain(channel, 5);
