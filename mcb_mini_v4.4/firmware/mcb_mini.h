@@ -82,12 +82,6 @@ void setEXTRAMode(uint8_t, uint8_t);
 
 // Comm functions
 void handleIncomingRx(uint8_t);
-void addMessageInt(uint8_t, uint8_t, int32_t);
-void addMessage3(uint8_t, uint8_t, uint8_t, uint8_t, uint8_t);
-void addMessage2(uint8_t, uint8_t, uint8_t, uint8_t);
-void addMessage1(uint8_t, uint8_t, uint8_t);
-void addMessage(uint8_t, uint8_t);
-void addMessageAndSendTxBuffer(void);
 void addCMDByteToTxBuffer(uint8_t);
 
 // Package functions
@@ -290,8 +284,8 @@ volatile unsigned char servo_active;
  * Global variables for both motors and their defaults
  */
 uint8_t volatile id;
-uint8_t volatile flag_should_change_id;
 uint8_t volatile new_id;
+volatile uint8_t should_change_id;
 uint8_t volatile tx_ready;
 
 uint32_t volatile loop_count = 0;
@@ -342,17 +336,13 @@ uint8_t volatile a2d_value_ready_flag;
 #define HEADER_BYTE  	0xAA
 #define ESCAPE_BYTE  	0x55
 
-uint8_t volatile next_byte_should_be_transformed = 0;
 uint8_t volatile write_checksum = 0;
-//uint8_t volatile txbuffer_empty = 1;
 
 uint8_t volatile timeout_timer = 0;
 
-#define NR_BUFFERS			3
-#define BUFFER_SIZE			30
-#define MSG_BUFFER_SIZE		45
+#define NR_BUFFERS			2
+#define BUFFER_SIZE			40
 
-circBuffer msg_buffer;
 circBuffer tx_buffer;
 circBuffer incoming_buffers[NR_BUFFERS];
 uint8_t volatile rx_buf_index = 0;
@@ -360,11 +350,10 @@ uint8_t volatile package_buf_index = 0;
 uint8_t volatile rx_checksum;
 volatile unsigned char rx_have_received_package = 0;
 
-static uint8_t msg_buffer_data[MSG_BUFFER_SIZE];
 static uint8_t tx_buffer_data[BUFFER_SIZE];
 static uint8_t buffer_data1[BUFFER_SIZE];
 static uint8_t buffer_data2[BUFFER_SIZE];
-static uint8_t buffer_data3[BUFFER_SIZE];
+//static uint8_t buffer_data3[BUFFER_SIZE];
 //static uint8_t buffer_data4[BUFFER_SIZE];
 //static uint8_t buffer_data5[BUFFER_SIZE];
 //static uint8_t buffer_data6[BUFFER_SIZE];
@@ -453,6 +442,20 @@ static uint8_t buffer_data3[BUFFER_SIZE];
 #define ERROR_SET_PARAM_DURING_ENABLE		9
 #define ERROR_MSG_BUFFER_OVERFLOW			10
 
-
+/*
+ * Flags used to signal when messages should be sent etc.
+ */
+volatile uint16_t RX_FLAGS = 0;
+#define FLAG_SHOULD_NOTIFY_TIMEOUT				0
+#define FLAG_SHOULD_SEND_EXTRA_VAL_A			1
+#define FLAG_SHOULD_SEND_EXTRA_VAL_B			2
+#define FLAG_SHOULD_NOTIFY_BUFFER_OVERFLOW		3
+#define FLAG_SHOULD_NOTIFY_PACKET_OVERFLOW		4
+#define FLAG_SHOULD_NOTIFY_BAD_CHECKSUM			5
+#define FLAG_SHOULD_NOTIFY_UNINITIALIZED_A		6
+#define FLAG_SHOULD_NOTIFY_UNINITIALIZED_B		7
+#define FLAG_NEXT_BYTE_SHOULD_BE_TRANSFORMED	8
+#define FLAG_SHOULD_NOTIFY_FAULT_A				9
+#define FLAG_SHOULD_NOTIFY_FAULT_B				10
 
 #endif

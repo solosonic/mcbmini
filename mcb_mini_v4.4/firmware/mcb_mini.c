@@ -31,7 +31,7 @@
 // Date:	13 des. '12
 //
 
-#define FIRMWARE_VERSION 	31
+#define FIRMWARE_VERSION 	32
 
 #include "circBuffer.h"
 #include "mcb_mini.h"
@@ -41,7 +41,7 @@
 #include <util/delay.h>
 #include <avr/eeprom.h>
 #include <util/atomic.h>
-
+#include <avr/wdt.h>
 #include "motor.h"
 #include "controller.h"
 
@@ -53,6 +53,10 @@ int main(void){
 	// Set stack pointer to top of RAM (MUST HAPPEN BEFORE ANY FUNCTION CALL)
 	SPH = (uint8_t)(RAMEND >> 8);
 	SPL = (uint8_t)(RAMEND);
+
+	// Use Watchdog timer to reset ourselves if we ever get into trouble
+	wdt_enable(WDTO_250MS);
+	wdt_reset();
 
 	uint8_t m, i;
 
@@ -68,7 +72,6 @@ int main(void){
 	ctrlInitState(&controller[0], &motor[0], target_buffer_data_A, TARGET_BUFFER_SIZE, actual_buffer_data_A, ACTUAL_BUFFER_SIZE);
 	setEXTRAMode( 0, EXTRA_MODE_ANALOG );
 
-
 	initMotor(&motor[1], 1);
 	ctrlInitState(&controller[1], &motor[1], target_buffer_data_B, TARGET_BUFFER_SIZE, actual_buffer_data_B, ACTUAL_BUFFER_SIZE);
 	setEXTRAMode( 1, EXTRA_MODE_ANALOG );
@@ -77,11 +80,24 @@ int main(void){
 
 	timeout_timer = 0;
 
+	id = 255; // Start with an invalid ID until we read our own
+
 	/*
 	 * Begin the control loop !
 	 */
 	while(1){
+        wdt_reset();
 		loop_count++;
+
+		/*
+		 * 25 iterations into the loop (should be about 250ms) we read our ID
+		 * This is to only read the ID after any startup electrical transients have settled
+		 */
+		if( loop_count == 25 && id == 255 ){
+			ATOMIC_BLOCK(ATOMIC_FORCEON){
+				readID();
+			}
+		}
 
 		//
 		// Do a bunch of household processing while we wait for our timer to run up
@@ -103,9 +119,9 @@ int main(void){
 
 			// Check to see if we need to set new ID, this takes a while
 			ATOMIC_BLOCK(ATOMIC_FORCEON){
-				if( flag_should_change_id != 0 ){
+				if( should_change_id != 0 ){
 					changeID(new_id);
-					flag_should_change_id = 0;
+					should_change_id = 0;
 				}
 			}
 		} while( TCNT0 < pid_update_period );
@@ -115,7 +131,7 @@ int main(void){
 		if( timeout_timer > 250 &&  timeout_timer != 255 ){
 			controller[0].enable = ENABLE_OFF;
 			controller[1].enable = ENABLE_OFF;
-			addMessage1(CMD_ERROR, 0, ERROR_TIMEOUT_DISABLE);
+			SETBIT( RX_FLAGS, FLAG_SHOULD_NOTIFY_TIMEOUT );
 			timeout_timer = 255;	// Set it to a fixed value so that this only happens once
 		}
 
@@ -248,7 +264,7 @@ void changeID(uint8_t new_id_val){
 	uint8_t i, start, read;
 
 	// This is a paranoid check to make sure we don't get into this function through some weird mechanism
-	if( flag_should_change_id != 123){
+	if( should_change_id != 123){
 		return;
 	}
 
@@ -368,45 +384,12 @@ void addIntToTxBufferReversed(int32_t in){
 	addByteToTxBuffer( (in>>24) & 0xff);
 }
 
-void addMessageAndSendTxBuffer(void){
-	uint8_t cmd, channel = 0, i, cnt;
-
-	ATOMIC_BLOCK(ATOMIC_FORCEON){
-		if( msg_buffer.length >= 3 ){
-			cmd = circBufferGetLast(&msg_buffer);
-			channel = circBufferGetLast(&msg_buffer);
-			cnt = circBufferGetLast(&msg_buffer);
-			if( msg_buffer.length >= cnt && cnt <= 8 ){		// The number 8 is just a random number larger than any packet we would want to send (makes sure we don't send accidentally 200 bytes)
-				for(i=0; i<cnt; i++){
-					addByteToTxBuffer(circBufferGetLast(&msg_buffer));
-				}
-				addCMDByteToTxBuffer(cmd);
-				sendTxBuffer(channel);
-			}
-			else{
-				msg_buffer.length = 0;	// Flush buffer, there is an error
-				msg_buffer.index = 0;	// Flush buffer, there is an error
-				addByteToTxBuffer(ERROR_MSG_BUFFER_OVERFLOW);
-				addCMDByteToTxBuffer(CMD_ERROR);
-				sendTxBuffer(channel);
-			}
-		}
-		else{
-			msg_buffer.length = 0;	// Flush buffer, there is an error
-			msg_buffer.index = 0;	// Flush buffer, there is an error
-			addByteToTxBuffer(ERROR_MSG_BUFFER_OVERFLOW);
-			addCMDByteToTxBuffer(CMD_ERROR);
-			sendTxBuffer(channel);
-		}
-	}
-}
-
 void addCMDByteToTxBuffer(uint8_t byte){
-	ATOMIC_BLOCK(ATOMIC_FORCEON){
-		if( msg_buffer.length >= 3 ){
-			SETBIT(byte, 7);
-		}
-	}
+//	ATOMIC_BLOCK(ATOMIC_FORCEON){
+//		if( msg_buffer.length >= 3 ){
+//			SETBIT(byte, 7);
+//		}
+//	}
 	addByteToTxBuffer(byte);
 }
 
@@ -459,102 +442,12 @@ signed long readIntFromEndReversed(circBuffer* buffer){
 	return ((int32_t)hh<<24) + ((int32_t)hl<<16) + ((int32_t)lh<<8) + (int32_t)ll;
 }
 
-void addMessage(uint8_t cmd, uint8_t channel){
-	if( circBufferFree(&msg_buffer) >= 3 ){
-		circBufferPut(&msg_buffer, 0);
-		circBufferPut(&msg_buffer, channel);
-		circBufferPut(&msg_buffer, cmd);
-	}
-	else{
-		msg_buffer.length = 0;	// Flush buffer
-		msg_buffer.index = 0;	// Flush buffer
-		circBufferPut(&msg_buffer, ERROR_MSG_BUFFER_OVERFLOW);
-		circBufferPut(&msg_buffer, 1);
-		circBufferPut(&msg_buffer, channel);
-		circBufferPut(&msg_buffer, CMD_ERROR);
-	}
-}
-
-void addMessageInt(uint8_t cmd, uint8_t channel, int32_t data1){
-	if( circBufferFree(&msg_buffer) >= 7 ){
-		circBufferPut(&msg_buffer, (data1>>24) & 0xff);
-		circBufferPut(&msg_buffer, (data1>>16) & 0xff);
-		circBufferPut(&msg_buffer, (data1>>8) & 0xff);
-		circBufferPut(&msg_buffer, (data1) & 0xff);
-		circBufferPut(&msg_buffer, 4);
-		circBufferPut(&msg_buffer, channel);
-		circBufferPut(&msg_buffer, cmd);
-	}
-	else{
-		msg_buffer.length = 0;	// Flush buffer
-		msg_buffer.index = 0;	// Flush buffer
-		circBufferPut(&msg_buffer, ERROR_MSG_BUFFER_OVERFLOW);
-		circBufferPut(&msg_buffer, 1);
-		circBufferPut(&msg_buffer, channel);
-		circBufferPut(&msg_buffer, CMD_ERROR);
-	}
-}
-
-void addMessage3(uint8_t cmd, uint8_t channel, uint8_t data1, uint8_t data2, uint8_t data3){
-	if( circBufferFree(&msg_buffer) >= 6 ){
-		circBufferPut(&msg_buffer, data1);
-		circBufferPut(&msg_buffer, data2);
-		circBufferPut(&msg_buffer, data3);
-		circBufferPut(&msg_buffer, 3);
-		circBufferPut(&msg_buffer, channel);
-		circBufferPut(&msg_buffer, cmd);
-	}
-	else{
-		msg_buffer.length = 0;	// Flush buffer
-		msg_buffer.index = 0;	// Flush buffer
-		circBufferPut(&msg_buffer, ERROR_MSG_BUFFER_OVERFLOW);
-		circBufferPut(&msg_buffer, 1);
-		circBufferPut(&msg_buffer, channel);
-		circBufferPut(&msg_buffer, CMD_ERROR);
-	}
-}
-
-void addMessage2(uint8_t cmd, uint8_t channel, uint8_t data1, uint8_t data2){
-	if( circBufferFree(&msg_buffer) >= 5 ){
-		circBufferPut(&msg_buffer, data1);
-		circBufferPut(&msg_buffer, data2);
-		circBufferPut(&msg_buffer, 2);
-		circBufferPut(&msg_buffer, channel);
-		circBufferPut(&msg_buffer, cmd);
-	}
-	else{
-		msg_buffer.length = 0;	// Flush buffer
-		msg_buffer.index = 0;	// Flush buffer
-		circBufferPut(&msg_buffer, ERROR_MSG_BUFFER_OVERFLOW);
-		circBufferPut(&msg_buffer, 1);
-		circBufferPut(&msg_buffer, channel);
-		circBufferPut(&msg_buffer, CMD_ERROR);
-	}
-}
-
-void addMessage1(uint8_t cmd, uint8_t channel, uint8_t data1){
-	if ( circBufferFree(&msg_buffer) >= 4 ){
-		circBufferPut(&msg_buffer, data1);
-		circBufferPut(&msg_buffer, 1);
-		circBufferPut(&msg_buffer, channel);
-		circBufferPut(&msg_buffer, cmd);
-	}
-	else{
-		msg_buffer.length = 0;	// Flush buffer
-		msg_buffer.index = 0;	// Flush buffer
-		circBufferPut(&msg_buffer, ERROR_MSG_BUFFER_OVERFLOW);
-		circBufferPut(&msg_buffer, 1);
-		circBufferPut(&msg_buffer, channel);
-		circBufferPut(&msg_buffer, CMD_ERROR);
-	}
-}
-
 void processPackageBuffer(){
 
 	circBuffer* package_buf;
 	int32_t new_target;
 	uint8_t cmd, channel, request_response, new_val;
-	uint8_t should_send_message = 0;
+	uint8_t can_override_response = 0;
 
 	package_buf = &incoming_buffers[package_buf_index];
 
@@ -596,34 +489,65 @@ void processPackageBuffer(){
 	case CMD_2TARGET_TICK_2MOTOR_CURRENT:
 	case CMD_2TARGET_TICK_2POT:
 	case CMD_2TARGET_TICK_2ENCODER:
+		can_override_response = 1;
+
 		for(new_val=0; new_val<2; new_val++){
 			new_target = readIntFromEndReversed(package_buf);
 			if( new_target != LONG_MAX ){
 				circBufferPutLong(&controller[new_val].target_buffer, new_target);
 			}
-			if( controller[new_val].initialized == 0 && controller[new_val].notified_initialized == 0 ) {
-				addMessage1( CMD_ERROR, new_val, ERROR_UNINITIALIZED);
-				controller[new_val].notified_initialized = 1;
+			if( !controller[new_val].initialized && !controller[new_val].notified_initialized ) {
+				controller[new_val].notified_initialized = TRUE;
+				if( new_val == 0 ){
+					SETBIT( RX_FLAGS, FLAG_SHOULD_NOTIFY_UNINITIALIZED_A );
+				}
+				else{
+					SETBIT( RX_FLAGS, FLAG_SHOULD_NOTIFY_UNINITIALIZED_B );
+				}
 			}
 		}
 
 		switch( cmd ){
 		case CMD_2TARGET_TICK_ACTUAL:
 			if( controller[channel].feedback_mode == FEEDBACK_MODE_POT ){
-				addIntToTxBufferReversed(motor[channel].actual_pot);
+				if( controller[channel].initialized ){
+					addIntToTxBufferReversed(motor[channel].actual_pot);
+				}
+				else{
+					addIntToTxBufferReversed(LONG_MAX);
+				}
 			}
 			else{
-				addIntToTxBufferReversed( motor[channel].actual_enc );
+				if( controller[channel].initialized ){
+					addIntToTxBufferReversed( motor[channel].actual_enc );
+				}
+				else{
+					addIntToTxBufferReversed(LONG_MAX);
+				}
 			}
 			break;
 		case CMD_2TARGET_TICK_2ACTUAL:
-			if( controller[channel].feedback_mode == FEEDBACK_MODE_POT ){
-				addIntToTxBufferReversed(motor[1].actual_pot);
-				addIntToTxBufferReversed(motor[0].actual_pot);
+			if( controller[1].initialized ){
+				if( controller[1].feedback_mode == FEEDBACK_MODE_POT ){
+					addIntToTxBufferReversed(motor[1].actual_pot);
+				}
+				else{
+					addIntToTxBufferReversed(motor[1].actual_enc);
+				}
 			}
 			else{
-				addIntToTxBufferReversed( motor[1].actual_enc );
-				addIntToTxBufferReversed( motor[0].actual_enc );
+				addIntToTxBufferReversed(LONG_MAX);
+			}
+			if( controller[0].initialized ){
+				if( controller[0].feedback_mode == FEEDBACK_MODE_POT ){
+					addIntToTxBufferReversed(motor[0].actual_pot);
+				}
+				else{
+					addIntToTxBufferReversed(motor[0].actual_enc);
+				}
+			}
+			else{
+				addIntToTxBufferReversed(LONG_MAX);
 			}
 			break;
 		case CMD_2TARGET_TICK_2VELOCITY:
@@ -664,9 +588,14 @@ void processPackageBuffer(){
 			addCMDByteToTxBuffer(cmd);
 		}
 		else{
-			if( controller[channel].initialized == 0 && controller[channel].notified_initialized == 0 ) {
-				addMessage1( CMD_ERROR, channel, ERROR_UNINITIALIZED);
-				controller[channel].notified_initialized = 1;
+			if( !controller[channel].initialized && !controller[channel].notified_initialized ) {
+				controller[channel].notified_initialized = TRUE;
+				if( channel == 0 ){
+					SETBIT( RX_FLAGS, FLAG_SHOULD_NOTIFY_UNINITIALIZED_A );
+				}
+				else{
+					SETBIT( RX_FLAGS, FLAG_SHOULD_NOTIFY_UNINITIALIZED_B );
+				}
 			}
 			new_target = readIntFromEndReversed(package_buf);
 			if( new_target != LONG_MAX ){
@@ -879,15 +808,22 @@ void processPackageBuffer(){
 			new_id = circBufferGetLast(package_buf);
 
 			if( new_val == 0 ){
-				flag_should_change_id = 123; // Special value for paranoid checking
+				should_change_id = 123; // Special value for paranoid checking
 			}
 			else{
-				addMessage1(CMD_ERROR, 0, ERROR_BAD_ID_PACKET);
+				addByteToTxBuffer(new_val);
+				addByteToTxBuffer(ERROR_BAD_ID_PACKET);
+				addByteToTxBuffer(CMD_ERROR);
 			}
 
-			if( controller[0].enable == ENABLE_ON || controller[1].enable == ENABLE_ON ) addMessage1( CMD_ERROR, channel, ERROR_SET_PARAM_DURING_ENABLE );
-			controller[0].enable = ENABLE_OFF;
-			controller[1].enable = ENABLE_OFF;
+			for(new_val = 0; new_val < 2; new_val++){
+				if( controller[new_val].enable == ENABLE_ON){
+					addByteToTxBuffer(new_val);
+					addByteToTxBuffer(ERROR_SET_PARAM_DURING_ENABLE);
+					addByteToTxBuffer(CMD_ERROR);
+				}
+				controller[new_val].enable = ENABLE_OFF;
+			}
 		}
 		break;
 
@@ -1020,12 +956,12 @@ void processPackageBuffer(){
 
 	case CMD_REQUEST_MESSAGE:
 		if( request_response==1 ){
-			if( msg_buffer.length != 0 ){
-				should_send_message = 1;
-			}
-			else{
+//			if( msg_buffer.length != 0 ){
+//				should_send_message = 1;
+//			}
+//			else{
 				addCMDByteToTxBuffer(CMD_EMPTY_RESPONSE);
-			}
+//			}
 		}
 		break;
 
@@ -1071,31 +1007,90 @@ void processPackageBuffer(){
 
 	default:
 		// Wrong command
-		addMessage2(CMD_ERROR, channel, ERROR_BAD_CMD_RECEIVED, cmd);
+		addByteToTxBuffer(cmd);
+		addByteToTxBuffer(ERROR_BAD_CMD_RECEIVED);
+		addByteToTxBuffer(CMD_ERROR);
 	}
 
-	//
-	// If no response was made then we will add an empty response
-	//
-	if( tx_buffer.length == 0 && cmd != CMD_ID ){
-		// If we have a message waiting then we send it
-		if( msg_buffer.length != 0 ){
-			should_send_message = 1;
+	/*
+	 * Handle various messages
+	 */
+	if( can_override_response || (tx_buffer.length == 0 && cmd != CMD_ID) ){
+
+		if( BITSET( RX_FLAGS, FLAG_SHOULD_SEND_EXTRA_VAL_A ) ){
+			clearTxBuffer();
+			addByteToTxBuffer(motor[0].extra_switch);
+			addByteToTxBuffer(CMD_EXTRA_VALUE);
+			channel = 0;
+			CLEARBIT( RX_FLAGS, FLAG_SHOULD_SEND_EXTRA_VAL_A );
 		}
-		else{
-			addCMDByteToTxBuffer(CMD_EMPTY_RESPONSE);
+		else if( BITSET( RX_FLAGS, FLAG_SHOULD_SEND_EXTRA_VAL_B ) ){
+			clearTxBuffer();
+			addByteToTxBuffer(motor[1].extra_switch);
+			addByteToTxBuffer(CMD_EXTRA_VALUE);
+			channel = 1;
+			CLEARBIT( RX_FLAGS, FLAG_SHOULD_SEND_EXTRA_VAL_B );
+		}
+		else if( BITSET( RX_FLAGS, FLAG_SHOULD_NOTIFY_TIMEOUT ) ){
+			clearTxBuffer();
+			addByteToTxBuffer(CMD_EMPTY_RESPONSE); // Start by sending an empty reply to flush a bad packet in host if it got corrupt during reset or whatever
+			sendTxBuffer(channel);
+			addByteToTxBuffer(ERROR_TIMEOUT_DISABLE);
+			addByteToTxBuffer(CMD_ERROR);
+			CLEARBIT( RX_FLAGS, FLAG_SHOULD_NOTIFY_TIMEOUT );
+		}
+		else if( BITSET( RX_FLAGS, FLAG_SHOULD_NOTIFY_FAULT_A ) ){
+			clearTxBuffer();
+			addByteToTxBuffer(ERROR_FAULT);
+			addByteToTxBuffer(CMD_ERROR);
+			CLEARBIT( RX_FLAGS, FLAG_SHOULD_NOTIFY_FAULT_A );
+			channel = 0;
+		}
+		else if( BITSET( RX_FLAGS, FLAG_SHOULD_NOTIFY_FAULT_B ) ){
+			clearTxBuffer();
+			addByteToTxBuffer(ERROR_FAULT);
+			addByteToTxBuffer(CMD_ERROR);
+			CLEARBIT( RX_FLAGS, FLAG_SHOULD_NOTIFY_FAULT_B );
+			channel = 1;
+		}
+		else if( BITSET( RX_FLAGS, FLAG_SHOULD_NOTIFY_BUFFER_OVERFLOW ) ){
+			clearTxBuffer();
+			addByteToTxBuffer(ERROR_BUFFER_OVERFLOW);
+			addByteToTxBuffer(CMD_ERROR);
+			CLEARBIT( RX_FLAGS, FLAG_SHOULD_NOTIFY_BUFFER_OVERFLOW );
+		}
+		else if( BITSET( RX_FLAGS, FLAG_SHOULD_NOTIFY_PACKET_OVERFLOW ) ){
+			clearTxBuffer();
+			addByteToTxBuffer(ERROR_PACKET_OVERFLOW);
+			addByteToTxBuffer(CMD_ERROR);
+			CLEARBIT( RX_FLAGS, FLAG_SHOULD_NOTIFY_PACKET_OVERFLOW );
+		}
+		else if( BITSET( RX_FLAGS, FLAG_SHOULD_NOTIFY_BAD_CHECKSUM ) ){
+			clearTxBuffer();
+			addByteToTxBuffer(ERROR_BAD_CHECKSUM);
+			addByteToTxBuffer(CMD_ERROR);
+			CLEARBIT( RX_FLAGS, FLAG_SHOULD_NOTIFY_BAD_CHECKSUM );
+		}
+		else if( BITSET( RX_FLAGS, FLAG_SHOULD_NOTIFY_UNINITIALIZED_A ) ){
+			clearTxBuffer();
+			addByteToTxBuffer(ERROR_UNINITIALIZED);
+			addByteToTxBuffer(CMD_ERROR);
+			CLEARBIT( RX_FLAGS, FLAG_SHOULD_NOTIFY_UNINITIALIZED_A );
+			channel = 0;
+		}
+		else if( BITSET( RX_FLAGS, FLAG_SHOULD_NOTIFY_UNINITIALIZED_B ) ){
+			clearTxBuffer();
+			addByteToTxBuffer(ERROR_UNINITIALIZED);
+			addByteToTxBuffer(CMD_ERROR);
+			CLEARBIT( RX_FLAGS, FLAG_SHOULD_NOTIFY_UNINITIALIZED_B );
+			channel = 1;
 		}
 	}
 
 	//
 	// Send the message
 	//
-	if( should_send_message == 1 ){
-		addMessageAndSendTxBuffer();
-	}
-	else{
-		sendTxBuffer(channel);
-	}
+	sendTxBuffer(channel);
 
 	return;
 }
@@ -1121,13 +1116,15 @@ void setEXTRAMode(uint8_t channel, uint8_t mode){
 			SETBIT(PCMSK1, EXTRA1);
 			motor[channel].extra_switch = BITVAL(EXTRA1_PIN, EXTRA1);
 			// Send the current level of the switch
-			addMessageInt(CMD_EXTRA_VALUE, channel, (int32_t)motor[channel].extra_switch);
+			SETBIT( RX_FLAGS, FLAG_SHOULD_SEND_EXTRA_VAL_A );
 		}
 		else{
 			CLEARBIT(EXTRA2_DDR, EXTRA2);
 			SETBIT(EXTRA2_PORT, EXTRA2);
 			SETBIT(PCMSK1, EXTRA2);
 			motor[channel].extra_switch = BITVAL(EXTRA2_PIN, EXTRA2);
+			// Send the current level of the switch
+			SETBIT( RX_FLAGS, FLAG_SHOULD_SEND_EXTRA_VAL_B );
 		}
 	}
 	else if( mode == EXTRA_MODE_ANALOG ){
@@ -1269,17 +1266,9 @@ void avrInit(void)
 	SETBIT(EIMSK, INT0);
 	SETBIT(EIMSK, INT1);
 
-	// Here we wait for various startup transients to chill
-	_delay_ms(200);
-
 	// Sets the bridge into High z state
 	M1_PWM = 0;
 	M2_PWM = 0;
-
-	// Read our id
-	ATOMIC_BLOCK(ATOMIC_FORCEON){
-		readID();
-	}
 
 	// Init uart
 	SETBIT(UCSR0B, RXCIE0);
@@ -1302,19 +1291,11 @@ void avrInit(void)
 	// Init serial command packet buffers
 	circBufferInit(&incoming_buffers[0], buffer_data1, BUFFER_SIZE);
 	circBufferInit(&incoming_buffers[1], buffer_data2, BUFFER_SIZE);
-	circBufferInit(&incoming_buffers[2], buffer_data3, BUFFER_SIZE);
-	//	circBufferInit(&incoming_buffers[3], buffer_data4, BUFFER_SIZE);
-	//	circBufferInit(&incoming_buffers[4], buffer_data5, BUFFER_SIZE);
-	//	circBufferInit(&incoming_buffers[5], buffer_data6, BUFFER_SIZE);
-	//	circBufferInit(&incoming_buffers[6], buffer_data7, BUFFER_SIZE);
-	//	circBufferInit(&incoming_buffers[7], buffer_data8, BUFFER_SIZE);
 
 	circBufferInit(&tx_buffer, tx_buffer_data, BUFFER_SIZE);
 
-	circBufferInit(&msg_buffer, msg_buffer_data, MSG_BUFFER_SIZE);
-
 	// Init flags
-	flag_should_change_id = 0;
+	RX_FLAGS = 0;
 
 	// Init a/d
 	SETBIT(ADCSRA, ADEN);				// enable ADC (turn on ADC power)
@@ -1438,12 +1419,7 @@ ISR(USART_RX_vect){
 			//			DISABLE_TX;									// Release the bus
 
 			// Add a message
-			if( msg_buffer.size - msg_buffer.length >= 4 ){
-				msg_buffer.databuffer[msg_buffer.length++] = ERROR_BAD_CHECKSUM;
-				msg_buffer.databuffer[msg_buffer.length++] = 1;
-				msg_buffer.databuffer[msg_buffer.length++] = 0;
-				msg_buffer.databuffer[msg_buffer.length++] = CMD_ERROR;
-			}
+			SETBIT( RX_FLAGS, FLAG_SHOULD_NOTIFY_BAD_CHECKSUM );
 
 			incoming_buffers[rx_buf_index].length = 0;	// flush
 			incoming_buffers[rx_buf_index].index = 0;	// flush
@@ -1457,12 +1433,7 @@ ISR(USART_RX_vect){
 		// Here we could check to see if rx_buf_index==package_buf_index in which case we are not processing buffers fast enough
 		if( rx_buf_index == package_buf_index ){
 			// Add a message
-			if( msg_buffer.size - msg_buffer.length >= 4 ){
-				msg_buffer.databuffer[msg_buffer.length++] = ERROR_PACKET_OVERFLOW;
-				msg_buffer.databuffer[msg_buffer.length++] = 1;
-				msg_buffer.databuffer[msg_buffer.length++] = 0;
-				msg_buffer.databuffer[msg_buffer.length++] = CMD_ERROR;
-			}
+			SETBIT( RX_FLAGS, FLAG_SHOULD_NOTIFY_PACKET_OVERFLOW );
 		}
 		incoming_buffers[rx_buf_index].length = 0;	// flush
 		incoming_buffers[rx_buf_index].index = 0;	// flush
@@ -1471,13 +1442,13 @@ ISR(USART_RX_vect){
 	}
 
 	if( byte == ESCAPE_BYTE ){
-		next_byte_should_be_transformed = 1;
+		SETBIT( RX_FLAGS, FLAG_NEXT_BYTE_SHOULD_BE_TRANSFORMED );
 		return;
 	}
 
-	if( next_byte_should_be_transformed == 1 ){
+	if( BITSET( RX_FLAGS, FLAG_NEXT_BYTE_SHOULD_BE_TRANSFORMED ) ){
 		byte ^= 1;
-		next_byte_should_be_transformed = 0;
+		CLEARBIT( RX_FLAGS, FLAG_NEXT_BYTE_SHOULD_BE_TRANSFORMED );
 	}
 
 	// Here we add the incoming byte to the current rx buffer
@@ -1493,15 +1464,9 @@ ISR(USART_RX_vect){
 		rx_checksum = 0;				// Reset checksum
 
 		// Add a message
-		if( msg_buffer.size - msg_buffer.length >= 4 ){
-			msg_buffer.databuffer[msg_buffer.length++] = ERROR_BUFFER_OVERFLOW;
-			msg_buffer.databuffer[msg_buffer.length++] = 1;
-			msg_buffer.databuffer[msg_buffer.length++] = 0;
-			msg_buffer.databuffer[msg_buffer.length++] = CMD_ERROR;
-		}
+		SETBIT( RX_FLAGS, FLAG_SHOULD_NOTIFY_BUFFER_OVERFLOW );
 	}
 }
-
 
 // Interrupt handler for ADC complete interrupt.
 //ISR(SIG_ADC){
@@ -1515,14 +1480,13 @@ ISR(PCINT1_vect){
 	// If it was EXTRA1
 	if( BITVAL(EXTRA1_PIN, EXTRA1) != motor[0].extra_switch ){
 		motor[0].extra_switch = BITVAL(EXTRA1_PIN, EXTRA1);
-		addMessageInt(CMD_EXTRA_VALUE, 0, (int32_t)motor[0].extra_switch);
+		SETBIT( RX_FLAGS, FLAG_SHOULD_SEND_EXTRA_VAL_A );
 	}
 	if( BITVAL(EXTRA2_PIN, EXTRA2) != motor[1].extra_switch ){
 		motor[1].extra_switch = BITVAL(EXTRA2_PIN, EXTRA2);
-		addMessageInt(CMD_EXTRA_VALUE, 1, (int32_t)motor[1].extra_switch);
+		SETBIT( RX_FLAGS, FLAG_SHOULD_SEND_EXTRA_VAL_B );
 	}
 }
-
 
 // This is called when the bridge shuts down
 ISR(PCINT0_vect){
@@ -1534,7 +1498,8 @@ ISR(PCINT0_vect){
 	// First we need to figure out which bridge complained
 	if( BITCLEAR(M1_DIAG_A_PIN, M1_DIAG_A) /* || BITCLEAR(M1_DIAG_B_PIN, M1_DIAG_B) */ ){
 		controller[0].enable = ENABLE_OFF;
-		addMessage1(CMD_ERROR, 0, ERROR_FAULT);
+		SETBIT( RX_FLAGS, FLAG_SHOULD_NOTIFY_FAULT_A );
+//		addMessage1(CMD_ERROR, 0, ERROR_FAULT);
 
 		// Reset the bridge
 		M1_PWM = 0;
@@ -1542,13 +1507,14 @@ ISR(PCINT0_vect){
 		_delay_us(100);
 		M1_STOP_VCC;
 		_delay_us(100);
-		//		M1_DISABLE;
+//				M1_DISABLE;
 		changeLEDMode( LED_MODE_PULSE_2 );
 	}
 
 	if( BITCLEAR(M2_DIAG_A_PIN, M2_DIAG_A) /* || BITCLEAR(M2_DIAG_B_PIN, M2_DIAG_B) */ ){
 		controller[1].enable = ENABLE_OFF;
-		addMessage1(CMD_ERROR, 1, ERROR_FAULT);
+		SETBIT( RX_FLAGS, FLAG_SHOULD_NOTIFY_FAULT_B );
+//		addMessage1(CMD_ERROR, 1, ERROR_FAULT);
 
 		// Reset the bridge
 		M2_PWM = 0;
