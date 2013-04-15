@@ -55,7 +55,6 @@ public class MCBMiniBoard {
 
 	private EnumMap<ChannelParameter, Integer>[] params;
 	private EnumMap<ChannelParameter, Integer>[] params_in_use;
-	private EnumMap<Command, Integer> commands_in_use;
 
 	private EnumMap<Error, Integer>[] error_counts;
 
@@ -69,7 +68,6 @@ public class MCBMiniBoard {
 		this.id = id;
 		params = new EnumMap[2];
 		params_in_use = new EnumMap[2];
-		commands_in_use = new EnumMap<Command, Integer>( Command.class );
 		fresh_target = new boolean[2];
 		error_counts = new EnumMap[2];
 
@@ -91,6 +89,12 @@ public class MCBMiniBoard {
 				// Here we are marking some parameters that shouldn't be synchronized unless they get explicitly set with a setter method
 				params[channel.index].put(param, Integer.MAX_VALUE);
 			}
+
+			params[channel.index].put(ChannelParameter.ACTUAL_TICK, 0);
+			params[channel.index].put(ChannelParameter.ACTUAL_POT, 0);
+			params[channel.index].put(ChannelParameter.ACTUAL_ENCODER, 0);
+			params[channel.index].put(ChannelParameter.MOTOR_CURRENT, 0);
+			params[channel.index].put(ChannelParameter.EXTRA_PIN_VALUE, 0);
 
 			setEnabled(channel, false);
 
@@ -284,7 +288,6 @@ public class MCBMiniBoard {
 	 */
 	protected void clearParametersInUse(Channel channel){
 		params_in_use[channel.index].clear();
-		commands_in_use.clear();
 
 		params_dirty[channel.index] = true;
 	}
