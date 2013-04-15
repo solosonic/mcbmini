@@ -437,7 +437,6 @@ public class MCBMiniServer{
 					HashMap<Command, Integer> dirtyParameters = board.getDirtyParameters(channel);
 					if( dirtyParameters != null ){
 						ser_manager.writeParameterPacket(board, channel, dirtyParameters);
-
 						// Here we stop the current loop as we already have a big buffer to push out
 						ser_manager.sendTxBuffer();
 						return;
@@ -737,11 +736,20 @@ public class MCBMiniServer{
 
 		// If this is a response to our target pos special then just put current data into the motor objects
 		if( command == Command.TWO_TARGET_TICK_ACTUAL || command == Command.TWO_TARGET_TICK_VELOCITY ){
-			board.setChannelParameter(ch, ChannelParameter.ACTUAL_TICK,  ByteBufferUtils.getIntFromBack(bb) );
+			int tick = ByteBufferUtils.getIntFromBack(bb);
+			if( tick != Integer.MAX_VALUE ){
+				board.setChannelParameter(ch, ChannelParameter.ACTUAL_TICK, tick );
+			}
 		}
 		else if( command == Command.TWO_TARGET_TICK_TWO_ACTUAL || command == Command.TWO_TARGET_TICK_TWO_VELOCITY ){
-			board.setChannelParameter(Channel.A, ChannelParameter.ACTUAL_TICK,  ByteBufferUtils.getIntFromBack(bb) );
-			board.setChannelParameter(Channel.B, ChannelParameter.ACTUAL_TICK,  ByteBufferUtils.getIntFromBack(bb) );
+			int tick = ByteBufferUtils.getIntFromBack(bb);
+			if( tick != Integer.MAX_VALUE ){
+				board.setChannelParameter(Channel.A, ChannelParameter.ACTUAL_TICK,  tick );
+			}
+			tick = ByteBufferUtils.getIntFromBack(bb);
+			if( tick != Integer.MAX_VALUE ){
+				board.setChannelParameter(Channel.B, ChannelParameter.ACTUAL_TICK,  tick );
+			}
 		}
 		else if( command == Command.TWO_TARGET_TICK_TWO_ENCODER ){
 			board.setChannelParameter(Channel.A, ChannelParameter.ACTUAL_ENCODER,  ByteBufferUtils.getIntFromBack(bb) );
