@@ -45,7 +45,8 @@ program: $(PRG).hex
 	avrdude $(AVRDUDE_FLAGS) -U flash:w:$(PRG).hex
 
 LFUSE = 0xCE
-HFUSE = 0xDC
+#HFUSE = 0xDC
+HFUSE = 0xCC // Watch Dog Timer on
 EFUSE = 0xF9
 AVRDUDE_LFUSE = -U lfuse:w:$(LFUSE):m
 AVRDUDE_HFUSE = -U hfuse:w:$(HFUSE):m
