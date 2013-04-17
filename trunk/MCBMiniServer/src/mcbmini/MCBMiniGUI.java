@@ -89,6 +89,7 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.prefs.Preferences;
 
 public class MCBMiniGUI {
@@ -242,12 +243,34 @@ public class MCBMiniGUI {
 			System.exit(0);
 		}
 
+		/*
+		 *  Here we wait for the boards to initialize and report back
+		 */
+		final AtomicBoolean boardsResponded = new AtomicBoolean(false);
+		new Thread(new Runnable() {
+			@Override
+			public void run() {
+				try {
+					Thread.sleep(5000);
+				} catch (InterruptedException e) {
+					e.printStackTrace();
+				}
+				if( !boardsResponded.get() ){
+					error("Did not get an initial response from all the boards");
+					System.exit(0);
+				}
+			}
+		}).start();
+
+		server_instance.waitForServerInitialization();
+		boardsResponded.set(true);
+
 		final MCBMiniGUI gui = new MCBMiniGUI(server_instance);
 
 		// Main timer that updates GUI and event handling
 		float upd_frequency = 30;
 		Timer t = new Timer((int)(1000/upd_frequency), new ActionListener() {
-//			//@Override
+			@Override
 			public void actionPerformed(ActionEvent arg0) {
 				server_instance.update();
 				gui.update();
