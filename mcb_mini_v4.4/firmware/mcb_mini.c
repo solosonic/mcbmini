@@ -167,13 +167,6 @@ int main(void){
 		 */
 		for( m=0; m<2; m++ )
 		{
-			if( isPackageBufferReady() == 1 ){
-				processPackageBuffer();
-				// Mark as handled
-				circBufferReset(&incoming_buffers[package_buf_index]);
-				package_buf_index = ( package_buf_index+1 )%NR_BUFFERS;
-			}
-
 			// First we update our current encoder value from the fast 16bit interrupt routines
 			int16_t temp2;
 			ATOMIC_BLOCK(ATOMIC_FORCEON){
@@ -452,7 +445,6 @@ void processPackageBuffer(){
 	cmd = cmd & 0b01111111;						// Mask the channel bit
 
 	if( cmd != id && cmd != BCAST_ID ){
-//		DISABLE_TX;
 		return;
 	}
 
