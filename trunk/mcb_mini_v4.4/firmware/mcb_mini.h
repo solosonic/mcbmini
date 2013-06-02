@@ -344,7 +344,6 @@ uint8_t volatile timeout_timer = 0;
 
 #define TX_BUFFER_SIZE		25
 
-
 circBuffer* tx_sending_buffer;
 circBuffer* tx_package_buffer;
 circBuffer tx_bufferss[NR_BUFFERS];
