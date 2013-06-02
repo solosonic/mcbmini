@@ -96,7 +96,7 @@ void processPackageBuffer(void);
 void addByteToTxBuffer(uint8_t);
 void addIntToTxBufferReversed(int32_t);
 long readIntFromEndReversed(circBuffer*);
-void sendTxBuffer(uint8_t);
+void finalizeTxBuffer(uint8_t);
 void clearTxBuffer(void);
 
 /*
@@ -286,7 +286,6 @@ volatile unsigned char servo_active;
 uint8_t volatile id;
 uint8_t volatile new_id;
 volatile uint8_t should_change_id;
-uint8_t volatile tx_ready;
 
 uint32_t volatile loop_count = 0;
 
@@ -341,16 +340,25 @@ uint8_t volatile write_checksum = 0;
 uint8_t volatile timeout_timer = 0;
 
 #define NR_BUFFERS			2
-#define BUFFER_SIZE			40
+#define BUFFER_SIZE			30
 
-circBuffer tx_buffer;
+#define TX_BUFFER_SIZE		25
+
+
+circBuffer* tx_sending_buffer;
+circBuffer* tx_package_buffer;
+circBuffer tx_bufferss[NR_BUFFERS];
+uint8_t volatile tx_index = 0;
+uint8_t volatile tx_is_sending;
+
 circBuffer incoming_buffers[NR_BUFFERS];
 uint8_t volatile rx_buf_index = 0;
 uint8_t volatile package_buf_index = 0;
 uint8_t volatile rx_checksum;
 volatile unsigned char rx_have_received_package = 0;
 
-static uint8_t tx_buffer_data[BUFFER_SIZE];
+static uint8_t tx_buffer_data1[TX_BUFFER_SIZE];
+static uint8_t tx_buffer_data2[TX_BUFFER_SIZE];
 static uint8_t buffer_data1[BUFFER_SIZE];
 static uint8_t buffer_data2[BUFFER_SIZE];
 //static uint8_t buffer_data3[BUFFER_SIZE];

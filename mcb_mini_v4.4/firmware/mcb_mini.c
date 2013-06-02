@@ -31,7 +31,7 @@
 // Date:	13 des. '12
 //
 
-#define FIRMWARE_VERSION 	32
+#define FIRMWARE_VERSION 	33
 
 #include "circBuffer.h"
 #include "mcb_mini.h"
@@ -167,6 +167,13 @@ int main(void){
 		 */
 		for( m=0; m<2; m++ )
 		{
+			if( isPackageBufferReady() == 1 ){
+				processPackageBuffer();
+				// Mark as handled
+				circBufferReset(&incoming_buffers[package_buf_index]);
+				package_buf_index = ( package_buf_index+1 )%NR_BUFFERS;
+			}
+
 			// First we update our current encoder value from the fast 16bit interrupt routines
 			int16_t temp2;
 			ATOMIC_BLOCK(ATOMIC_FORCEON){
@@ -397,36 +404,21 @@ void addByteToTxBuffer(uint8_t byte){
 	write_checksum += byte;
 	if( byte == HEADER_BYTE || byte == ESCAPE_BYTE ){
 		byte ^= 1;
-		circBufferPut(&tx_buffer, ESCAPE_BYTE);
+		circBufferPut(tx_package_buffer, ESCAPE_BYTE);
 	}
-	circBufferPut(&tx_buffer, byte);
+	circBufferPut(tx_package_buffer, byte);
 }
 
 void clearTxBuffer(){
-	circBufferReset( &tx_buffer );
+	circBufferReset( tx_package_buffer );
 	write_checksum = 0;
 }
 
-void sendTxBuffer(uint8_t motor){
-
-	if( tx_buffer.length > 0 ){
-		// wait for the transmitter to be ready
-		while(tx_ready == FALSE) ;
-
-		ENABLE_TX;
+void finalizeTxBuffer(uint8_t motor){
+	if( tx_package_buffer->length > 0 ){
 		addByteToTxBuffer( (motor<<7) | id);
 		addByteToTxBuffer(write_checksum);
-		circBufferPut(&tx_buffer, HEADER_BYTE);
-
-
-		// We are now holding on to the line until we know for sure that another board should speak
-		//		ENABLE_TX;
-
-		// send byte
-		UDR0 = circBufferGetFirst(&tx_buffer);
-		// set ready state to FALSE
-		tx_ready = FALSE;
-
+		circBufferPut(tx_package_buffer, HEADER_BYTE);
 		write_checksum = 0;
 	}
 }
@@ -443,7 +435,6 @@ signed long readIntFromEndReversed(circBuffer* buffer){
 }
 
 void processPackageBuffer(){
-
 	circBuffer* package_buf;
 	int32_t new_target;
 	uint8_t cmd, channel, request_response, new_val;
@@ -461,6 +452,7 @@ void processPackageBuffer(){
 	cmd = cmd & 0b01111111;						// Mask the channel bit
 
 	if( cmd != id && cmd != BCAST_ID ){
+//		DISABLE_TX;
 		return;
 	}
 
@@ -1015,7 +1007,7 @@ void processPackageBuffer(){
 	/*
 	 * Handle various messages
 	 */
-	if( can_override_response || (tx_buffer.length == 0 && cmd != CMD_ID) ){
+	if( can_override_response || (tx_package_buffer->length == 0 && cmd != CMD_ID) ){
 
 		if( BITSET( RX_FLAGS, FLAG_SHOULD_SEND_EXTRA_VAL_A ) ){
 			clearTxBuffer();
@@ -1034,7 +1026,7 @@ void processPackageBuffer(){
 		else if( BITSET( RX_FLAGS, FLAG_SHOULD_NOTIFY_TIMEOUT ) ){
 			clearTxBuffer();
 			addByteToTxBuffer(CMD_EMPTY_RESPONSE); // Start by sending an empty reply to flush a bad packet in host if it got corrupt during reset or whatever
-			sendTxBuffer(channel);
+			finalizeTxBuffer(channel);
 			addByteToTxBuffer(ERROR_TIMEOUT_DISABLE);
 			addByteToTxBuffer(CMD_ERROR);
 			CLEARBIT( RX_FLAGS, FLAG_SHOULD_NOTIFY_TIMEOUT );
@@ -1090,7 +1082,7 @@ void processPackageBuffer(){
 	//
 	// Send the message
 	//
-	sendTxBuffer(channel);
+	finalizeTxBuffer(channel);
 
 	return;
 }
@@ -1280,8 +1272,6 @@ void avrInit(void)
 	UBRR0H = (unsigned char)( UBRRVAL >> 8);
 	UBRR0L = (unsigned char) UBRRVAL ;
 
-	tx_ready = TRUE;
-
 	// Set tx pin as input normally
 	CLEARBIT(DDRD, 1);
 	// Enable the tx pullup resistor
@@ -1292,7 +1282,14 @@ void avrInit(void)
 	circBufferInit(&incoming_buffers[0], buffer_data1, BUFFER_SIZE);
 	circBufferInit(&incoming_buffers[1], buffer_data2, BUFFER_SIZE);
 
-	circBufferInit(&tx_buffer, tx_buffer_data, BUFFER_SIZE);
+	circBufferInit(&tx_bufferss[0], tx_buffer_data1, TX_BUFFER_SIZE);
+	circBufferInit(&tx_bufferss[1], tx_buffer_data2, TX_BUFFER_SIZE);
+
+	tx_index = 0;
+	tx_sending_buffer = &tx_bufferss[ tx_index ];
+	tx_package_buffer = &tx_bufferss[ (tx_index+1)%2 ];
+
+	tx_is_sending = FALSE;
 
 	// Init flags
 	RX_FLAGS = 0;
@@ -1376,21 +1373,22 @@ EMPTY_INTERRUPT(BADISR_vect)
 ISR(USART_TX_vect, ISR_NOBLOCK){
 	uint8_t data;
 	// check if there's data left in the buffer
-	if( tx_buffer.length > 0 ) {
+	if( tx_sending_buffer->length > 0 ) {
 		// send byte from top of buffer
 		// get the first character from buffer
-		data = tx_buffer.databuffer[tx_buffer.index];
-		tx_buffer.index = (tx_buffer.index+1)%tx_buffer.size;
-		tx_buffer.length--;
+		data = tx_sending_buffer->databuffer[tx_sending_buffer->index];
+		tx_sending_buffer->index = (tx_sending_buffer->index+1)%tx_sending_buffer->size;
+		tx_sending_buffer->length--;
 		// move index down and decrement length
 
 		UDR0 = data;
 	}
 	else{
 		// Reset buffer
-		tx_buffer.index = 0;
-		tx_buffer.length = 0;
-		tx_ready = TRUE;
+		tx_sending_buffer->index = 0;
+		tx_sending_buffer->length = 0;
+
+		tx_is_sending = FALSE;
 		DISABLE_TX;
 	}
 }
@@ -1416,7 +1414,7 @@ ISR(USART_RX_vect){
 
 		// If checksums don't match reject
 		if( rx_checksum != byte ){
-			//			DISABLE_TX;									// Release the bus
+//			DISABLE_TX;
 
 			// Add a message
 			SETBIT( RX_FLAGS, FLAG_SHOULD_NOTIFY_BAD_CHECKSUM );
@@ -1427,14 +1425,40 @@ ISR(USART_RX_vect){
 			return;
 		}
 
-		// Here we create the package buffer
-		rx_buf_index = ( rx_buf_index+1 )%NR_BUFFERS;
+		// Extract the ID
+		byte = incoming_buffers[rx_buf_index].databuffer[incoming_buffers[rx_buf_index].length-1];
+		byte = byte & 0b01111111;
+		if( byte == id || byte == BCAST_ID ){
+			// Here we create the package buffer
+			rx_buf_index = ( rx_buf_index+1 )%NR_BUFFERS;
 
-		// Here we could check to see if rx_buf_index==package_buf_index in which case we are not processing buffers fast enough
-		if( rx_buf_index == package_buf_index ){
-			// Add a message
-			SETBIT( RX_FLAGS, FLAG_SHOULD_NOTIFY_PACKET_OVERFLOW );
+			// Here we could check to see if rx_buf_index==package_buf_index in which case we are not processing buffers fast enough
+			if( rx_buf_index == package_buf_index ){
+				// Add a message
+				SETBIT( RX_FLAGS, FLAG_SHOULD_NOTIFY_PACKET_OVERFLOW );
+			}
+
+			// Now we immediately start sending the last data buffer
+			ENABLE_TX;
+
+			// Switch the buffers
+			tx_index = (tx_index+1)%2;
+			tx_sending_buffer = &tx_bufferss[ tx_index ];
+			tx_package_buffer = &tx_bufferss[ (tx_index+1)%2 ];
+
+			// Start sending the sending buffer
+			if( tx_sending_buffer->length > 0 ){
+				UDR0 = tx_sending_buffer->databuffer[tx_sending_buffer->index];
+				tx_sending_buffer->index = (tx_sending_buffer->index+1)%tx_sending_buffer->size;
+				tx_sending_buffer->length--;
+
+				tx_is_sending = TRUE;
+			}
 		}
+		else{
+//			DISABLE_TX;
+		}
+
 		incoming_buffers[rx_buf_index].length = 0;	// flush
 		incoming_buffers[rx_buf_index].index = 0;	// flush
 		rx_checksum = 0;							// Reset checksum
