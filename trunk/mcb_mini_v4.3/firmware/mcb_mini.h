@@ -99,7 +99,7 @@ void processPackageBuffer(void);
 void addByteToTxBuffer(uint8_t);
 void addIntToTxBufferReversed(int32_t);
 long readIntFromEndReversed(circBuffer*);
-void sendTxBuffer(uint8_t);
+void finalizeTxBuffer(uint8_t);
 void clearTxBuffer(void);
 
 /*
@@ -246,9 +246,8 @@ void clearTxBuffer(void);
  * Global variables for both motors and their defaults
  */
 uint8_t volatile id;
-uint8_t volatile flag_should_change_id;
 uint8_t volatile new_id;
-uint8_t volatile tx_ready;
+uint8_t volatile flag_should_change_id;
 
 uint32_t volatile loop_count = 0;
 
@@ -271,8 +270,8 @@ static uint8_t actual_buffer_data_B[ACTUAL_BUFFER_SIZE];
 /*
  * a2d vars
  */
-#define A2D_ITERATIONS 4			// Needs to be divisible by 2
-#define A2D_ITERATIONS_DIV2 2		// This should satisfy 2^(A2D_ITERATIONS_DIV2) = A2D_ITERATIONS
+#define A2D_ITERATIONS_DIV2 	2
+#define A2D_ITERATIONS 			1<<A2D_ITERATIONS_DIV2		// Needs to be divisible by 2
 
 uint8_t volatile a2d_index;
 uint8_t volatile a2d_counter;
@@ -297,27 +296,32 @@ uint8_t volatile write_checksum = 0;
 
 uint8_t volatile timeout_timer = 0;
 
-#define NR_BUFFERS		4
-#define BUFFER_SIZE		45
+#define NR_BUFFERS		2
+#define BUFFER_SIZE		30
 #define MSG_BUFFER_SIZE		128
 
+#define TX_BUFFER_SIZE		25
+
+circBuffer* tx_sending_buffer;
+circBuffer* tx_package_buffer;
+circBuffer tx_bufferss[NR_BUFFERS];
+uint8_t volatile tx_index = 0;
+uint8_t volatile tx_is_sending;
+
 circBuffer msg_buffer;
-circBuffer tx_buffer;
 circBuffer incoming_buffers[NR_BUFFERS];
 uint8_t volatile rx_buf_index = 0;
 uint8_t volatile package_buf_index = 0;
 uint8_t volatile rx_checksum;
 
 static uint8_t msg_buffer_data[MSG_BUFFER_SIZE];
-static uint8_t tx_buffer_data[BUFFER_SIZE];
+
+static uint8_t tx_buffer_data1[TX_BUFFER_SIZE];
+static uint8_t tx_buffer_data2[TX_BUFFER_SIZE];
+
 static uint8_t buffer_data1[BUFFER_SIZE];
 static uint8_t buffer_data2[BUFFER_SIZE];
-static uint8_t buffer_data3[BUFFER_SIZE];
-static uint8_t buffer_data4[BUFFER_SIZE];
-static uint8_t buffer_data5[BUFFER_SIZE];
-static uint8_t buffer_data6[BUFFER_SIZE];
-static uint8_t buffer_data7[BUFFER_SIZE];
-static uint8_t buffer_data8[BUFFER_SIZE];
+//static uint8_t buffer_data3[BUFFER_SIZE];
 
 uint8_t volatile debug_msg0;
 int32_t volatile debug_msg1;
