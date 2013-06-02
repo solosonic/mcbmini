@@ -31,7 +31,7 @@
 // Date:	10 Dec. '12
 //
 
-#define FIRMWARE_VERSION 	17
+#define FIRMWARE_VERSION 	18
 
 #include "circBuffer.h"
 
@@ -72,11 +72,23 @@ int main(void){
 
 	timeout_timer = 0;
 
+	id = 255; // Start with an invalid ID until we read our own
+
 	/*
 	 * Begin the control loop !
 	 */
 	while(1){
 		loop_count++;
+
+		/*
+		 * 25 iterations into the loop (should be about 250ms) we read our ID
+		 * This is to only read the ID after any startup electrical transients have settled
+		 */
+		if( loop_count == 25 && id == 255 ){
+			ATOMIC_BLOCK(ATOMIC_FORCEON){
+				readID();
+			}
+		}
 
 		//
 		// Do a bunch of household processing while we wait for our timer to run up
@@ -329,14 +341,14 @@ void addMessageAndSendTxBuffer(void){
 					addByteToTxBuffer(circBufferGetLast(&msg_buffer));
 				}
 				addCMDByteToTxBuffer(cmd);
-				sendTxBuffer(channel);
+				finalizeTxBuffer(channel);
 			}
 			else{
 				msg_buffer.length = 0;	// Flush buffer, there is an error
 				msg_buffer.index = 0;	// Flush buffer, there is an error
 				addByteToTxBuffer(ERROR_MSG_BUFFER_OVERFLOW);
 				addCMDByteToTxBuffer(CMD_ERROR);
-				sendTxBuffer(channel);
+				finalizeTxBuffer(channel);
 			}
 		}
 		else{
@@ -344,7 +356,7 @@ void addMessageAndSendTxBuffer(void){
 			msg_buffer.index = 0;	// Flush buffer, there is an error
 			addByteToTxBuffer(ERROR_MSG_BUFFER_OVERFLOW);
 			addCMDByteToTxBuffer(CMD_ERROR);
-			sendTxBuffer(channel);
+			finalizeTxBuffer(channel);
 		}
 	}
 }
@@ -363,36 +375,21 @@ void addByteToTxBuffer(uint8_t byte){
 	write_checksum += byte;
 	if( byte == HEADER_BYTE || byte == ESCAPE_BYTE ){
 		byte ^= 1;
-		circBufferPut(&tx_buffer, ESCAPE_BYTE);
+		circBufferPut(tx_package_buffer, ESCAPE_BYTE);
 	}
-	circBufferPut(&tx_buffer, byte);
+	circBufferPut(tx_package_buffer, byte);
 }
 
 void clearTxBuffer(){
-	circBufferReset( &tx_buffer );
+	circBufferReset( tx_package_buffer );
 	write_checksum = 0;
 }
 
-void sendTxBuffer(uint8_t motor){
-
-	if( tx_buffer.length > 0 ){
-		// wait for the transmitter to be ready
-		while(tx_ready == FALSE) ;
-
-		ENABLE_TX;
+void finalizeTxBuffer(uint8_t motor){
+	if( tx_package_buffer->length > 0 ){
 		addByteToTxBuffer( (motor<<7) | id);
 		addByteToTxBuffer(write_checksum);
-		circBufferPut(&tx_buffer, HEADER_BYTE);
-
-
-		// We are now holding on to the line until we know for sure that another board should speak
-		//		ENABLE_TX;
-
-		// send byte
-		UDR0 = circBufferGetFirst(&tx_buffer);
-		// set ready state to FALSE
-		tx_ready = FALSE;
-
+		circBufferPut(tx_package_buffer, HEADER_BYTE);
 		write_checksum = 0;
 	}
 }
@@ -544,7 +541,8 @@ void processPackageBuffer(){
 			if( new_target != LONG_MAX ){
 				circBufferPutLong(&controller[new_val].target_buffer, new_target);
 			}
-			if( controller[new_val].initialized == 0 && controller[new_val].notified_initialized == 0 ) {
+			if( !controller[new_val].initialized && !controller[new_val].notified_initialized ) {
+				controller[new_val].notified_initialized = TRUE;
 				addMessage1( CMD_ERROR, new_val, ERROR_UNINITIALIZED);
 				controller[new_val].notified_initialized = 1;
 			}
@@ -553,20 +551,44 @@ void processPackageBuffer(){
 		switch( cmd ){
 		case CMD_2TARGET_TICK_ACTUAL:
 			if( controller[channel].feedback_mode == FEEDBACK_MODE_POT ){
-				addIntToTxBufferReversed(motor[channel].actual_pot);
+				if( controller[channel].initialized ){
+					addIntToTxBufferReversed(motor[channel].actual_pot);
+				}
+				else{
+					addIntToTxBufferReversed(LONG_MAX);
+				}
 			}
 			else{
-				addIntToTxBufferReversed( motor[channel].actual_enc );
+				if( controller[channel].initialized ){
+					addIntToTxBufferReversed( motor[channel].actual_enc );
+				}
+				else{
+					addIntToTxBufferReversed(LONG_MAX);
+				}
 			}
 			break;
 		case CMD_2TARGET_TICK_2ACTUAL:
-			if( controller[channel].feedback_mode == FEEDBACK_MODE_POT ){
-				addIntToTxBufferReversed(motor[1].actual_pot);
-				addIntToTxBufferReversed(motor[0].actual_pot);
+			if( controller[1].initialized ){
+				if( controller[1].feedback_mode == FEEDBACK_MODE_POT ){
+					addIntToTxBufferReversed(motor[1].actual_pot);
+				}
+				else{
+					addIntToTxBufferReversed(motor[1].actual_enc);
+				}
 			}
 			else{
-				addIntToTxBufferReversed( motor[1].actual_enc );
-				addIntToTxBufferReversed( motor[0].actual_enc );
+				addIntToTxBufferReversed(LONG_MAX);
+			}
+			if( controller[0].initialized ){
+				if( controller[0].feedback_mode == FEEDBACK_MODE_POT ){
+					addIntToTxBufferReversed(motor[0].actual_pot);
+				}
+				else{
+					addIntToTxBufferReversed(motor[0].actual_enc);
+				}
+			}
+			else{
+				addIntToTxBufferReversed(LONG_MAX);
 			}
 			break;
 		case CMD_2TARGET_TICK_2VELOCITY:
@@ -607,9 +629,9 @@ void processPackageBuffer(){
 			addCMDByteToTxBuffer(cmd);
 		}
 		else{
-			if( controller[channel].initialized == 0 && controller[channel].notified_initialized == 0 ) {
+			if( !controller[channel].initialized && !controller[channel].notified_initialized ) {
+				controller[channel].notified_initialized = TRUE;
 				addMessage1( CMD_ERROR, channel, ERROR_UNINITIALIZED);
-				controller[channel].notified_initialized = 1;
 			}
 			new_target = readIntFromEndReversed(package_buf);
 			if( new_target != LONG_MAX ){
@@ -970,7 +992,7 @@ void processPackageBuffer(){
 //
 //	 If no response was made then we will add an empty response
 //
-	if( tx_buffer.length == 0 && cmd != CMD_ID ){
+	if( tx_package_buffer->length == 0 && cmd != CMD_ID ){
 		// If we have a message waiting then we send it
 		if( msg_buffer.length != 0 ){
 			should_send_message = 1;
@@ -987,7 +1009,7 @@ void processPackageBuffer(){
 		addMessageAndSendTxBuffer();
 	}
 	else{
-		sendTxBuffer(channel);
+		finalizeTxBuffer(channel);
 	}
 
 	return;
@@ -1083,17 +1105,9 @@ void avrInit(void)
 	SETBIT(EIMSK, INT0);
 	SETBIT(EIMSK, INT1);
 
-	// Here we wait for various startup transients to chill
-	_delay_ms(200);
-
 	// Sets the bridge into High z state
 	M1_ALL_OFF;
 	M2_ALL_OFF;
-
-	// Read our id
-	ATOMIC_BLOCK(ATOMIC_FORCEON){
-		readID();
-	}
 
 	// Init uart
 	SETBIT(UCSR0B, RXCIE0);
@@ -1105,8 +1119,6 @@ void avrInit(void)
 	UBRR0H = (unsigned char)( UBRRVAL >> 8);
 	UBRR0L = (unsigned char) UBRRVAL ;
 
-	tx_ready = TRUE;
-
 	// Set tx pin as input normally
 	CLEARBIT(DDRD, 1);
 	// Enable the tx pullup resistor
@@ -1116,14 +1128,15 @@ void avrInit(void)
 	// Init serial command packet buffers
 	circBufferInit(&incoming_buffers[0], buffer_data1, BUFFER_SIZE);
 	circBufferInit(&incoming_buffers[1], buffer_data2, BUFFER_SIZE);
-	circBufferInit(&incoming_buffers[2], buffer_data3, BUFFER_SIZE);
-	circBufferInit(&incoming_buffers[3], buffer_data4, BUFFER_SIZE);
-	circBufferInit(&incoming_buffers[4], buffer_data5, BUFFER_SIZE);
-	circBufferInit(&incoming_buffers[5], buffer_data6, BUFFER_SIZE);
-	circBufferInit(&incoming_buffers[6], buffer_data7, BUFFER_SIZE);
-	circBufferInit(&incoming_buffers[7], buffer_data8, BUFFER_SIZE);
 
-	circBufferInit(&tx_buffer, tx_buffer_data, BUFFER_SIZE);
+	circBufferInit(&tx_bufferss[0], tx_buffer_data1, TX_BUFFER_SIZE);
+	circBufferInit(&tx_bufferss[1], tx_buffer_data2, TX_BUFFER_SIZE);
+
+	tx_index = 0;
+	tx_sending_buffer = &tx_bufferss[ tx_index ];
+	tx_package_buffer = &tx_bufferss[ (tx_index+1)%2 ];
+
+	tx_is_sending = FALSE;
 
 	circBufferInit(&msg_buffer, msg_buffer_data, MSG_BUFFER_SIZE);
 
@@ -1214,21 +1227,22 @@ EMPTY_INTERRUPT(BADISR_vect)
 ISR(USART_TX_vect, ISR_NOBLOCK){
 	uint8_t data;
 	// check if there's data left in the buffer
-	if( tx_buffer.length > 0 ) {
+	if( tx_sending_buffer->length > 0 ) {
 		// send byte from top of buffer
 		// get the first character from buffer
-		data = tx_buffer.databuffer[tx_buffer.index];
-		tx_buffer.index = (tx_buffer.index+1)%tx_buffer.size;
-		tx_buffer.length--;
+		data = tx_sending_buffer->databuffer[tx_sending_buffer->index];
+		tx_sending_buffer->index = (tx_sending_buffer->index+1)%tx_sending_buffer->size;
+		tx_sending_buffer->length--;
 		// move index down and decrement length
 
 		UDR0 = data;
 	}
 	else{
 		// Reset buffer
-		tx_buffer.index = 0;
-		tx_buffer.length = 0;
-		tx_ready = TRUE;
+		tx_sending_buffer->index = 0;
+		tx_sending_buffer->length = 0;
+
+		tx_is_sending = FALSE;
 		DISABLE_TX;
 	}
 }
@@ -1271,17 +1285,43 @@ ISR(USART_RX_vect){
 			return;
 		}
 
-		// Here we create the package buffer
-		rx_buf_index = ( rx_buf_index+1 )%NR_BUFFERS;
-		// Here we could check to see if rx_buf_index==package_buf_index in which case we are not processing buffers fast enough
-		if( rx_buf_index == package_buf_index ){
-			// Add a message
-			if( msg_buffer.size - msg_buffer.length >= 4 ){
-				msg_buffer.databuffer[msg_buffer.length++] = ERROR_PACKET_OVERFLOW;
-				msg_buffer.databuffer[msg_buffer.length++] = 1;
-				msg_buffer.databuffer[msg_buffer.length++] = 0;
-				msg_buffer.databuffer[msg_buffer.length++] = CMD_ERROR;
+		// Extract the ID
+		byte = incoming_buffers[rx_buf_index].databuffer[incoming_buffers[rx_buf_index].length-1];
+		byte = byte & 0b01111111;
+		if( byte == id || byte == BCAST_ID ){
+
+			// Here we create the package buffer
+			rx_buf_index = ( rx_buf_index+1 )%NR_BUFFERS;
+			// Here we could check to see if rx_buf_index==package_buf_index in which case we are not processing buffers fast enough
+			if( rx_buf_index == package_buf_index ){
+				// Add a message
+				if( msg_buffer.size - msg_buffer.length >= 4 ){
+					msg_buffer.databuffer[msg_buffer.length++] = ERROR_PACKET_OVERFLOW;
+					msg_buffer.databuffer[msg_buffer.length++] = 1;
+					msg_buffer.databuffer[msg_buffer.length++] = 0;
+					msg_buffer.databuffer[msg_buffer.length++] = CMD_ERROR;
+				}
 			}
+
+					// Now we immediately start sending the last data buffer
+			ENABLE_TX;
+
+			// Switch the buffers
+			tx_index = (tx_index+1)%2;
+			tx_sending_buffer = &tx_bufferss[ tx_index ];
+			tx_package_buffer = &tx_bufferss[ (tx_index+1)%2 ];
+
+			// Start sending the sending buffer
+			if( tx_sending_buffer->length > 0 ){
+				UDR0 = tx_sending_buffer->databuffer[tx_sending_buffer->index];
+				tx_sending_buffer->index = (tx_sending_buffer->index+1)%tx_sending_buffer->size;
+				tx_sending_buffer->length--;
+
+				tx_is_sending = TRUE;
+			}
+		}
+		else{
+//			DISABLE_TX;
 		}
 
 		incoming_buffers[rx_buf_index].length = 0;	// flush
