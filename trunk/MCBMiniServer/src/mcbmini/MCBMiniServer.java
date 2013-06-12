@@ -168,7 +168,7 @@ public class MCBMiniServer{
 	
 	public MCBMiniServer(String port_name, ArrayList<MCBMiniBoard> boards, float update_rate, boolean should_skip_firmware_check) throws IOException{
 		MCBMiniSerialManager serman = new MCBMiniSerialManager(port_name, BAUD_RATE);
-		init(serman, boards, update_rate, false);
+		init(serman, boards, update_rate, should_skip_firmware_check);
 	}
 
 	public MCBMiniServer(MCBMiniSerialManager ser_manager, ArrayList<MCBMiniBoard> boards) throws IOException{
