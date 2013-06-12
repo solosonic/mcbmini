@@ -67,7 +67,6 @@ import org.jdom.Element;
 public class MCBMiniServer{
 
 	private static final double server_version = 1.0;
-
 	private static final double minimum_config_file_version = 1.0;
 
 	public static double getServerVersion(){
@@ -80,17 +79,16 @@ public class MCBMiniServer{
 
 	public static final boolean DEBUG = false;
 
-	protected static boolean SHOULD_RESEND_LAST_KNOWN_TICKS_ON_BOARD_RESET = true;
-	protected static boolean SHOULD_RESEND_LAST_ENABLED_VALUE_ON_BOARD_RESET = true;
-
-	static{
-		// Check for inconsistency in the options above
-		if( SHOULD_RESEND_LAST_ENABLED_VALUE_ON_BOARD_RESET && !SHOULD_RESEND_LAST_ENABLED_VALUE_ON_BOARD_RESET ){
-			throw new RuntimeException("MCBMiniMotorServer: This is dangerous, I am being told to re-enable boards on reset but not give them the last known tick values. This could lead to an uncalibrated restart.");
-		}
-	}
+	private boolean should_resend_last_known_ticks_on_reset;
+	private boolean should_resend_last_enabled_value_on_reset;
 
 	protected int minimum_firmware_version = 16;
+
+	private boolean should_skip_firmware_checking = false;
+	private int board_firmware_response_count;
+	private int lowest_reported_firmware_version;
+	private boolean board_firmware_has_been_confirmed = false;
+
 
 	private static final float DEFAULT_UPDATE_RATE = 50f;
 
@@ -131,7 +129,8 @@ public class MCBMiniServer{
 	private long last_check_for_timeouts_ms;
 
 	private MCBMiniSerialManager ser_manager;
-
+	private String portName;
+	
 	private List<Request> incoming_requests;
 
 	private static final Channel[] CHANNELS = Channel.values();
@@ -153,32 +152,40 @@ public class MCBMiniServer{
 
 	public enum FaultHandlingPolicy {DO_NOTHING, RE_ENABLE};
 
-	private int board_firmware_response_count;
-	private int lowest_reported_firmware_version;
-	private boolean board_firmware_has_been_confirmed = false;;
-
 	private FaultHandlingPolicy fault_handling_policy = FaultHandlingPolicy.DO_NOTHING;
 
 	public MCBMiniServer(String port_name, ArrayList<MCBMiniBoard> boards) throws IOException{
-		this(port_name, boards, DEFAULT_UPDATE_RATE);
+		this(port_name, boards, false);
+	}
+
+	public MCBMiniServer(String port_name, ArrayList<MCBMiniBoard> boards, boolean should_skip_firmware_check) throws IOException{
+		this(port_name, boards, DEFAULT_UPDATE_RATE, should_skip_firmware_check);
 	}
 
 	public MCBMiniServer(String port_name, ArrayList<MCBMiniBoard> boards, float update_rate) throws IOException{
+		this(port_name, boards, update_rate, false);
+	}
+	
+	public MCBMiniServer(String port_name, ArrayList<MCBMiniBoard> boards, float update_rate, boolean should_skip_firmware_check) throws IOException{
 		MCBMiniSerialManager serman = new MCBMiniSerialManager(port_name, BAUD_RATE);
-
-		init(serman, boards, update_rate);
+		init(serman, boards, update_rate, false);
 	}
 
 	public MCBMiniServer(MCBMiniSerialManager ser_manager, ArrayList<MCBMiniBoard> boards) throws IOException{
-		init(ser_manager, boards, DEFAULT_UPDATE_RATE);
+		init(ser_manager, boards, DEFAULT_UPDATE_RATE, false);
 	}
 
 	public MCBMiniServer(MCBMiniSerialManager ser_manager, ArrayList<MCBMiniBoard> boards, float update_rate) throws IOException{
-		init(ser_manager, boards, update_rate);
+		init(ser_manager, boards, update_rate, false);
 	}
 
-	private void init(MCBMiniSerialManager serial_manager, final ArrayList<MCBMiniBoard> boards, final float update_rate) throws IOException{
+	private void init(MCBMiniSerialManager serial_manager, final ArrayList<MCBMiniBoard> boards, final float update_rate, boolean should_skip_firmware_check) throws IOException{
 		this.boards = boards;
+		this.should_skip_firmware_checking = should_skip_firmware_check;
+		
+		should_resend_last_enabled_value_on_reset = true;
+		should_resend_last_known_ticks_on_reset = true;
+
 
 		// Start by checking to see if any of the boards have invalid IDs
 		ArrayList<Integer> ids = new ArrayList<Integer>();
@@ -309,12 +316,17 @@ public class MCBMiniServer{
 		board_firmware_response_count = 0;
 		lowest_reported_firmware_version = Integer.MAX_VALUE;
 
-		for (MCBMiniBoard board : boards) {
-			sendRequestForResponse(board, Channel.A, Command.FIRMWARE_VERSION, new FirmwareCheckingResponseHandler());
+		if( should_skip_firmware_check ){
+			response_types = createResponseTypes();
 		}
-		String str = "Waiting for all boards to report their firmware, IDs: ";
-		for (int i=0; i<boards.size()-1; i++) str += boards.get(i).getId()+", ";
-		Log.println(str+boards.get(boards.size()-1).getId()+":");
+		else{
+			for (MCBMiniBoard board : boards) {
+				sendRequestForResponse(board, Channel.A, Command.FIRMWARE_VERSION, new FirmwareCheckingResponseHandler());
+			}
+			String str = "Waiting for all boards to report their firmware, IDs: ";
+			for (int i=0; i<boards.size()-1; i++) str += boards.get(i).getId()+", ";
+			Log.println(str+boards.get(boards.size()-1).getId()+":");
+		}
 	}
 
 	protected ResponseType[] createResponseTypes(){
@@ -400,9 +412,7 @@ public class MCBMiniServer{
 	 * This method gets called at the update rate of the controllers from within the update thread
 	 */
 	private int internal_update_counter = 0;
-	private int responses_within_update_counter = 0;
 	private void internalUpdate(){
-		responses_within_update_counter = 0;
 		internal_update_counter++;
 		internal_upd_fm.update();
 
@@ -413,7 +423,7 @@ public class MCBMiniServer{
 			handleCommandInBuffer( buffer );
 		}
 
-		if( board_firmware_has_been_confirmed ){
+		if( !should_skip_firmware_checking && board_firmware_has_been_confirmed ){
 			/*
 			 * Check packet response flags
 			 */
@@ -580,6 +590,14 @@ public class MCBMiniServer{
 		}
 	}
 
+	public void setBoardResetOptions(boolean should_resend_last_enabled_value_on_reset, boolean should_resend_last_known_ticks_on_reset){
+		this.should_resend_last_enabled_value_on_reset = should_resend_last_enabled_value_on_reset;
+		this.should_resend_last_known_ticks_on_reset = should_resend_last_known_ticks_on_reset;
+
+		if( should_resend_last_enabled_value_on_reset && !should_resend_last_known_ticks_on_reset ){
+			throw new RuntimeException("MCBMiniMotorServer: This is dangerous, I am being told to re-enable boards on reset but not give them the last known tick values. This could lead to an uncalibrated restart.");
+		}
+	}
 
 	/**
 	 * This method posts a request down to a motorboard and doesn't anticipate an answer
@@ -728,11 +746,7 @@ public class MCBMiniServer{
 			sendRequestForResponse(board, ch, Command.REQUEST_MESSAGE, null);
 		}
 
-		// If this is the first response since last update
-		if( responses_within_update_counter == 0 ){
-			all_board_upd_fm.update();
-		}
-		responses_within_update_counter++;
+		all_board_upd_fm.update();
 
 		// If this is a response to our target pos special then just put current data into the motor objects
 		if( command == Command.TWO_TARGET_TICK_ACTUAL || command == Command.TWO_TARGET_TICK_VELOCITY ){
@@ -866,7 +880,7 @@ public class MCBMiniServer{
 				else if( error == Error.UNINITIALIZED ){
 					Log.println("\nBoard: "+board.getId()+", channel "+ch+" says it is uninitialized", true);
 					Log.println("\tServer responding by sending/resending parameters", true);
-					if( SHOULD_RESEND_LAST_ENABLED_VALUE_ON_BOARD_RESET ){
+					if( should_resend_last_enabled_value_on_reset ){
 						Log.println("\tAlso sending last known enabled value for channel "+ch+" : "+board.getChannelParameter(ch, ChannelParameter.ENABLED));
 					}
 					else{
@@ -878,7 +892,7 @@ public class MCBMiniServer{
 						board.setChannelParameter(ch, ChannelParameter.ENABLED, 0);
 					}
 
-					if( SHOULD_RESEND_LAST_KNOWN_TICKS_ON_BOARD_RESET ){
+					if( should_resend_last_known_ticks_on_reset ){
 						if( board.getChannelParameter(ch, ChannelParameter.FEEDBACK_MODE) == 0){
 							int tick = board.getChannelParameter(ch, ChannelParameter.ACTUAL_TICK);
 							Log.println("\tAlso sending offset of last known encoder value for channel "+ch+" : "+tick, true);
@@ -1016,6 +1030,10 @@ public class MCBMiniServer{
 				Log.println("All boards have reported their firmware, lowest firmware version: "+lowest_reported_firmware_version);
 				response_types = createResponseTypes();
 				board_firmware_has_been_confirmed = true;
+				
+				if( lowest_reported_firmware_version >= 18 ){
+					ser_manager.setMinMasterPacketSize( MCBMiniSerialManager.MIN_MASTER_PACKET_SIZE_NEW_FIRMWARE );
+				}
 			}
 		}
 

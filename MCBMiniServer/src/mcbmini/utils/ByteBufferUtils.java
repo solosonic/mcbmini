@@ -72,7 +72,7 @@ public class ByteBufferUtils {
 		for(int i=0; i<how_many; i++){
 			System.out.print((int)(bb.get(i)&0xff) + " ");
 		}
-		Log.println(" ");
+		System.out.println(" ");
 	}
 
 	public static byte calcChecksum(ByteBuffer bb){

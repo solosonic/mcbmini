@@ -115,6 +115,7 @@ public class MCBMiniGUI {
 		Log.println("\t-debug (run without a serial connection)");
 		Log.println("\t-port port_name (to override port in xml file)");
 		Log.println("\t-lib path_to_lib (path to native rxtx libraries)");
+		Log.println("\t-skipFirmwareVersionCheck (to skip the initial check for firmware version)");
 	}
 
 	private static void error(String error){
@@ -141,6 +142,7 @@ public class MCBMiniGUI {
 		String xml_file = null;
 		boolean debug = false;
 		String port_name = null;
+		boolean should_skip_firmware_check = false;
 
 		/*
 		 * If no arguments are passed, we might just have gotten clicked on so we open a choose file dialog
@@ -161,6 +163,10 @@ public class MCBMiniGUI {
 				if( args[i].equals("-debug") ){
 					debug = true;
 					Log.println("Running in debug mode (without a serial connection)");
+				}
+				if( args[i].equals("-skipFirmwareVersionCheck") ){
+					should_skip_firmware_check = true;
+					Log.println("Skipping initial firmware version checking");
 				}
 				if( args[i].equals("-port") && args.length > i+1 ){
 					port_name = args[i+1];
@@ -235,7 +241,7 @@ public class MCBMiniGUI {
 				server_instance = new DebugMCBMiniServer(xml_results.boards);
 			}
 			else{
-				server_instance = new MCBMiniServer( port_name==null?xml_results.port_name:port_name, xml_results.boards);
+				server_instance = new MCBMiniServer( port_name==null?xml_results.port_name:port_name, xml_results.boards, should_skip_firmware_check);
 				if( xml_results.minimum_firmware_version != 0 )server_instance.setMinimumFirmwareVersion(xml_results.minimum_firmware_version);
 			}
 		} catch (IOException e) {
@@ -246,24 +252,26 @@ public class MCBMiniGUI {
 		/*
 		 *  Here we wait for the boards to initialize and report back
 		 */
-		final AtomicBoolean boardsResponded = new AtomicBoolean(false);
-		new Thread(new Runnable() {
-			@Override
-			public void run() {
-				try {
-					Thread.sleep(5000);
-				} catch (InterruptedException e) {
-					e.printStackTrace();
+		if( !should_skip_firmware_check ){
+			final AtomicBoolean boardsResponded = new AtomicBoolean(false);
+			new Thread(new Runnable() {
+				@Override
+				public void run() {
+					try {
+						Thread.sleep(5000);
+					} catch (InterruptedException e) {
+						e.printStackTrace();
+					}
+					if( !boardsResponded.get() ){
+						error("Did not get an initial response from all the boards");
+						System.exit(0);
+					}
 				}
-				if( !boardsResponded.get() ){
-					error("Did not get an initial response from all the boards");
-					System.exit(0);
-				}
-			}
-		}).start();
-
-		server_instance.waitForServerInitialization();
-		boardsResponded.set(true);
+			}).start();
+			
+			server_instance.waitForServerInitialization();
+			boardsResponded.set(true);
+		}
 
 		final MCBMiniGUI gui = new MCBMiniGUI(server_instance);
 
@@ -357,7 +365,7 @@ public class MCBMiniGUI {
 		box.addView(should_use_target_pos);
 		topbox.addView(box);
 		internal_update_fps = new JLabel("Internal update rate: 00.0 Hz");
-		all_board_fps = new JLabel("Board cycle update rate: 00.0 Hz");
+		all_board_fps = new JLabel("Board response update rate: 00.0 Hz");
 		box = new Box("FPS");
 		box.addView(internal_update_fps);
 		box.addView(all_board_fps);
@@ -496,7 +504,7 @@ public class MCBMiniGUI {
 			 */
 			float[] fps = server.getUpdateRates(null);
 			internal_update_fps.setText("Internal update rate: "+Math.round(fps[0])+" Hz");
-			all_board_fps.setText("Board cycle update rate: "+Math.round(fps[1])+" Hz");
+			all_board_fps.setText("Board response update rate: "+Math.round(fps[1])+" Hz");
 		}
 	}
 
