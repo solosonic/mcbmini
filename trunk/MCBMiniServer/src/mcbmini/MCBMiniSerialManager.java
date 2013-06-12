@@ -59,8 +59,11 @@ public class MCBMiniSerialManager {
 // This effectively guides the max framerate of the system by making sure that no packet is shorter than this many bytes
 // This also makes sure that whenever a message is going out from the master, the slave that received the previous message has enough time to respond before the next one does
 // If this is too low then we start getting packet collisions
-	public static final int MIN_MASTER_PACKET_SIZE = 25;
 
+	public static final int MIN_MASTER_PACKET_SIZE_OLD_FIRMWARE = 25;
+	public static final int MIN_MASTER_PACKET_SIZE_NEW_FIRMWARE = 17;
+	private int minMasterPacketSize = MIN_MASTER_PACKET_SIZE_OLD_FIRMWARE;
+	
 	public static final byte HEADER_BYTE = (byte)0xAA;
 	public static final byte ESCAPE_BYTE = (byte)0x55;
 
@@ -84,7 +87,7 @@ public class MCBMiniSerialManager {
 		ser = new PSerial(port_name, baud_rate);
 		init();
 	}
-
+	
 	public MCBMiniSerialManager(iSerial pSerial){
 		this.ser = pSerial;
 		init();
@@ -104,6 +107,10 @@ public class MCBMiniSerialManager {
 		bad_checksum_received_counter = 0;
 	}
 
+	protected void setMinMasterPacketSize(int newValue){
+		minMasterPacketSize = newValue;
+	}
+	
 	public int getNumberOfBadChecksums(){
 		return bad_checksum_received_counter;
 	}
@@ -131,7 +138,7 @@ public class MCBMiniSerialManager {
 				if( checksum == checksum_rcv ){
 
 					// Make a new packet
-					ByteBuffer packet = ByteBuffer.allocate(256);
+					ByteBuffer packet = ByteBuffer.allocate(64);
 					packet.order(ByteOrder.LITTLE_ENDIAN);
 
 					read_bb.flip();
@@ -216,8 +223,8 @@ public class MCBMiniSerialManager {
 
 		// Pad with zeros because of slave bus contention issues
 		// This ensures that no master write packet is smaller than MIN_MASTER_PACKET_SIZE
-		if( temp_buffer.position() < MIN_MASTER_PACKET_SIZE ){
-			write_buffer.put(zero_bytes, 0, MIN_MASTER_PACKET_SIZE-temp_buffer.position());
+		if( temp_buffer.position() < minMasterPacketSize ){
+			write_buffer.put(zero_bytes, 0, minMasterPacketSize-temp_buffer.position());
 		}
 
 		// Put the subcommand into the buffer
