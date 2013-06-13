@@ -1431,15 +1431,16 @@ ISR(USART_RX_vect){
 			}
 
 			// Now we immediately start sending the last data buffer
-			ENABLE_TX;
 
 			// Switch the buffers
+			tx_package_buffer = &tx_bufferss[ tx_index ];
 			tx_index = (tx_index+1)%2;
 			tx_sending_buffer = &tx_bufferss[ tx_index ];
-			tx_package_buffer = &tx_bufferss[ (tx_index+1)%2 ];
 
 			// Start sending the sending buffer
 			if( tx_sending_buffer->length > 0 ){
+				ENABLE_TX;
+
 				UDR0 = tx_sending_buffer->databuffer[tx_sending_buffer->index];
 				tx_sending_buffer->index = (tx_sending_buffer->index+1)%tx_sending_buffer->size;
 				tx_sending_buffer->length--;
