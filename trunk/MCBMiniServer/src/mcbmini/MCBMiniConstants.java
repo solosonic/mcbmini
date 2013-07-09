@@ -107,9 +107,10 @@ public interface MCBMiniConstants {
 	};
 
 	public enum DataSize {
-		ZERO	(0),
-		U08		(1),
-		S32		(4);
+		ZERO		(0),
+		U08			(1),
+		S32			(4),
+		DOUBLE_S32	(8);
 
 		public int number_of_bytes;
 
@@ -185,11 +186,11 @@ public interface MCBMiniConstants {
 		TWO_TARGET_TICK_POT				( 43 , DataSize.S32 ),		// This command sets the target positions for both channels and requests specifically the current pot value back
 		TWO_TARGET_TICK_ENCODER			( 44 , DataSize.S32 ),		// This command sets the target positions for both channels and requests specifically the current encoder value back
 
-		TWO_TARGET_TICK_TWO_ACTUAL			( 45 , DataSize.S32 ),		// This command sets the target positions for both channels and requests the current actual value back for both channels
-		TWO_TARGET_TICK_TWO_VELOCITY		( 46 , DataSize.S32 ),		// This command sets the target positions for both channels and requests the current velocity back for both channels
-		TWO_TARGET_TICK_TWO_MOTOR_CURRENT	( 47 , DataSize.S32 ),		// This command sets the target positions for both channels and requests the electrical motor current value back for both channels
-		TWO_TARGET_TICK_TWO_POT				( 48 , DataSize.S32 ),		// This command sets the target positions for both channels and requests the potentiometer value back for both channels
-		TWO_TARGET_TICK_TWO_ENCODER			( 49 , DataSize.S32 ),		// This command sets the target positions for both channels and requests the encoder value back for both channels
+		TWO_TARGET_TICK_TWO_ACTUAL			( 45 , DataSize.DOUBLE_S32 ),		// This command sets the target positions for both channels and requests the current actual value back for both channels
+		TWO_TARGET_TICK_TWO_VELOCITY		( 46 , DataSize.DOUBLE_S32 ),		// This command sets the target positions for both channels and requests the current velocity back for both channels
+		TWO_TARGET_TICK_TWO_MOTOR_CURRENT	( 47 , DataSize.DOUBLE_S32 ),		// This command sets the target positions for both channels and requests the electrical motor current value back for both channels
+		TWO_TARGET_TICK_TWO_POT				( 48 , DataSize.DOUBLE_S32 ),		// This command sets the target positions for both channels and requests the potentiometer value back for both channels
+		TWO_TARGET_TICK_TWO_ENCODER			( 49 , DataSize.DOUBLE_S32 ),		// This command sets the target positions for both channels and requests the encoder value back for both channels
 
 		// This is for firmware versions > 17 for V4.4 and > 30 for V4.3
 		PID_UPDATE_PERIOD					( 50 , DataSize.U08 );		// This value sets the update rate of the PID (larger number, slower update rate) 195 is the default and is approximately 100Hz
