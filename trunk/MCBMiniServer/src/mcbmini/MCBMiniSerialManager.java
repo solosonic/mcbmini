@@ -67,8 +67,11 @@ public class MCBMiniSerialManager {
 	public static final byte HEADER_BYTE = (byte)0xAA;
 	public static final byte ESCAPE_BYTE = (byte)0x55;
 
+	private long escape_bytes_received;
+	private long total_bytes_received;
+	
 	private ByteBuffer read_bb;
-	private byte checksum = 0;
+//	private byte checksum = 0;
 
 	private byte[] temp_buffer_bytes;
 	private ByteBuffer temp_buffer;
@@ -103,8 +106,10 @@ public class MCBMiniSerialManager {
 		write_buffer = ByteBuffer.wrap(write_buffer_bytes);
 
 		zero_bytes = new byte[128];
-
 		bad_checksum_received_counter = 0;
+		
+		escape_bytes_received = 0;
+		total_bytes_received = 0;
 	}
 
 	protected void setMinMasterPacketSize(int newValue){
@@ -129,49 +134,59 @@ public class MCBMiniSerialManager {
 
 			// We might have a ready packet !
 			if( in == HEADER_BYTE ){
+				if( read_bb.position() < 3 ){
+					Log.println("Packet stub received");
+					read_bb.clear();
+					continue;
+				}
+
+				// Extract checksum from packet
 				byte checksum_rcv = read_bb.get( read_bb.position() - 1 );
 				read_bb.position( read_bb.position()-1 );
 
-				checksum -= checksum_rcv;
-
-				// If the checksum matches up
-				if( checksum == checksum_rcv ){
-
-					// Make a new packet
-					ByteBuffer packet = ByteBuffer.allocate(64);
-					packet.order(ByteOrder.LITTLE_ENDIAN);
-
-					read_bb.flip();
-					packet.put( read_bb );
-					packet.flip();
-
-					if( packet.limit() < 2  ){
-						Log.println("Error, every packet needs to be at least 2 values for id and command", true);
-						ByteBufferUtils.printByteBuffer(packet, packet.limit());
-					}
-					else{
-						return_buffers.add( packet );
-					}
-				}
-				// Received bad checksum
-				else{
-					/*
-					 * For now lets just discard the package (before we were doing a clever thing with seeing if there were "trash" bytes at the end of the packet and taking them out (of the buffer and the checksum) and seeing if the checksum mathced then
-					 * This caused some trouble some times
-					 */
-
-					Log.println("Packet with bad checksum received ! accumulated: "+ByteBufferUtils.byte2int(checksum)+", received: "+ByteBufferUtils.byte2int(checksum_rcv));
+				// Now we calculate the checksum in the package using the expected number of bytes
+				byte cmd = read_bb.get( read_bb.position()-2 );
+				Command command = MCBMiniConstants.Command.getForCmdId(cmd & 0xff);
+				int expectedNumberOfBytes = 2 + command.datasize.number_of_bytes;
+				
+				if( read_bb.position() < expectedNumberOfBytes ){
+					Log.println("Improper packet size");
 					ByteBufferUtils.printByteBuffer(read_bb, read_bb.position());
-					bad_checksum_received_counter++;
+					read_bb.clear();
+					continue;
 				}
 
-				// Clear the incoming buffer
-				checksum = 0;
+				// Make a new packet
+				read_bb.limit( read_bb.position() );
+				read_bb.position( read_bb.position()-expectedNumberOfBytes );
+				ByteBuffer packet = ByteBuffer.allocate(64);
+				packet.order(ByteOrder.LITTLE_ENDIAN);
+				packet.put( read_bb );
+				packet.flip();
+				
+				// Calculate checksum
+				byte checksum_calculated = 0;
+				for(int i=0; i<packet.limit(); i++){
+					checksum_calculated += packet.get(i);
+				}
+				
+				// If the checksums don't match up
+				if( checksum_calculated != checksum_rcv ){
+					Log.println("Packet with bad checksum received ! calculated: "+ByteBufferUtils.byte2int(checksum_calculated)+", received: "+ByteBufferUtils.byte2int(checksum_rcv));
+					ByteBufferUtils.printByteBuffer(packet, packet.limit());
+					bad_checksum_received_counter++;
+					read_bb.clear();
+					continue;
+				}
+
+				// Add the packet buffer to be handled
+				return_buffers.add( packet );
 				read_bb.clear();
 				continue;
 			}
 
 			if( in == ESCAPE_BYTE ){
+				escape_bytes_received++;
 				next_byte_should_be_transformed = true;
 				continue;
 			}
@@ -181,7 +196,7 @@ public class MCBMiniSerialManager {
 				next_byte_should_be_transformed = false;
 			}
 
-			checksum += in;
+			total_bytes_received++;
 			read_bb.put(in);
 		}
 		return return_buffers;
