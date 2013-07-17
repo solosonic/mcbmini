@@ -655,18 +655,24 @@ public class MCBMiniGUI {
 				channelbox.addView( enable[channel.index] = new JCheckBox("Enable", motor.getChannelParameter(channel, ChannelParameter.ENABLED)==1) );
 				channelbox.addView(slidergroup);
 
-				int low, high, init;
-				if( motor.getChannelParameter(channel, ChannelParameter.FEEDBACK_MODE) == FeedbackMode.POT.id ){
-					low = 0; high = 1023; init = 512;
-				}
-				else{
-					if( motor.getChannelParameter(channel, ChannelParameter.CONTROL_MODE) == ControlMode.VELOCITY.id ){
-						low = -200; high = 200; init = 0;
-					}
+				int low = motor.getMinTarget(channel);
+				int high = motor.getMaxTarget(channel);
+				int init = motor.getDefaultTarget(channel);
+
+				if( low == -Integer.MAX_VALUE ){
+					if( motor.getFeedbackMode(channel) == FeedbackMode.POT ){
+						low = 0; high = 1023; init = 512;
+					}				
 					else{
-						low = -2000; high = 2000; init = 0;
+						if( motor.getChannelParameter(channel, ChannelParameter.CONTROL_MODE) == ControlMode.VELOCITY.id ){
+							low = -200; high = 200; init = 0;
+						}
+						else{
+							low = -2000; high = 2000; init = 0;
+						}
 					}
 				}
+				
 				target_filter[channel.index] = new RunningAvgFilter(5, init, low, high);
 				slidergroup.addView( target_pos[channel.index] = new Slider("Target position", low, high, init) );
 				slidergroup.addView( actual_pos[channel.index] = new Slider("Actual position", low, high, init) );

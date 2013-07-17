@@ -115,6 +115,10 @@ public class MCBMiniBoard {
 			setControlMode(channel, ControlMode.POSITION);
 			setStreamMode(channel, StreamMode.OFF);
 			setSlowEnableConstant(channel, 30);
+			
+			setMinTarget(channel, -Integer.MAX_VALUE);
+			setMaxTarget(channel, Integer.MAX_VALUE);
+			setDefaultTarget(channel, 0);
 		}
 	}
 
@@ -161,14 +165,28 @@ public class MCBMiniBoard {
 	public void applyTargetFunction(Channel channel){
 		TargetFunction targetFunction = target_functions[channel.index];
 		if( targetFunction != null ){
-			params[channel.index].put(ChannelParameter.TARGET_TICK, targetFunction.applyFunction());
+			int value = targetFunction.applyFunction();
+			value = Math.max(getMinTarget(channel), value);
+			value = Math.min(getMaxTarget(channel), value);
+
+			params[channel.index].put(ChannelParameter.TARGET_TICK, value);
 			fresh_target[channel.index] = true;
 		}
 	}
 
+	
 	/*
 	 * These are convenience methods to get/put parameters
 	 */
+	public int getDefaultTarget(Channel channel){ return getChannelParameter(channel, ChannelParameter.TARGET_DEFAULT); }
+	public void setDefaultTarget(Channel channel, int value){ setChannelParameter(channel, ChannelParameter.TARGET_DEFAULT, value); }
+
+	public int getMinTarget(Channel channel){ return getChannelParameter(channel, ChannelParameter.TARGET_MIN); }
+	public void setMinTarget(Channel channel, int value){ setChannelParameter(channel, ChannelParameter.TARGET_MIN, value); }
+
+	public int getMaxTarget(Channel channel){ return getChannelParameter(channel, ChannelParameter.TARGET_MAX); }
+	public void setMaxTarget(Channel channel, int value){ setChannelParameter(channel, ChannelParameter.TARGET_MAX, value); }
+
 	public int getPositionPGain(Channel channel){ return getChannelParameter(channel, ChannelParameter.POS_P_GAIN); }
 	public void setPositionPGain(Channel channel, int value){ limitCheckLow(value, 0); setChannelParameter(channel, ChannelParameter.POS_P_GAIN, value); }
 
@@ -206,6 +224,10 @@ public class MCBMiniBoard {
 
 	public synchronized void setTargetTick(Channel channel, int value){
 		target_functions[channel.index] = null;	// If someone sets the target position manually, then we disable any function that might be in control
+		
+		value = Math.max(getMinTarget(channel), value);
+		value = Math.min(getMaxTarget(channel), value);
+		
 		params[channel.index].put(ChannelParameter.TARGET_TICK, value);	// This is a bit faster
 		fresh_target[channel.index] = true;
 	}
