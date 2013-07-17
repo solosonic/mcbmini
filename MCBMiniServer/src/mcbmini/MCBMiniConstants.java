@@ -83,7 +83,11 @@ public interface MCBMiniConstants {
 		ACTUAL_POT				( Command.POT_VALUE, false ),
 		ACTUAL_ENCODER			( Command.ENCODER_VALUE, false ),
 
-		PID_UPDATE_PERIOD		( Command.PID_UPDATE_PERIOD, true );
+		PID_UPDATE_PERIOD		( Command.PID_UPDATE_PERIOD, true ),
+
+		TARGET_MIN				( null, false ),
+		TARGET_MAX				( null, false ),
+		TARGET_DEFAULT			( null, false );
 
 		public Command command;
 		public boolean forward_to_board_on_change;

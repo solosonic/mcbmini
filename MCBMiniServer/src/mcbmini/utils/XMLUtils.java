@@ -193,6 +193,14 @@ public class XMLUtils {
 
 			ExtraPinMode extra_pin_mode = getOptionalEnum(motor, "extra_pin", MCBMiniConstants.ExtraPinMode.values());
 			if( extra_pin_mode != null ) miniBoard.setExtraPinMode(channel, extra_pin_mode);
+			
+			String optional = getOptional(motor, "min_ticks");
+			if( optional != null ) miniBoard.setMinTarget(channel, Integer.parseInt(optional));
+			optional = getOptional(motor, "max_ticks");
+			if( optional != null ) miniBoard.setMaxTarget(channel, Integer.parseInt(optional));
+			optional = getOptional(motor, "center_ticks");
+			if( optional != null ) miniBoard.setDefaultTarget(channel, Integer.parseInt(optional));
+			
 		}
 		if( !(channels_done[0] && channels_done[1]) ) throw new RuntimeException("XML error: MCBMini board "+id+" doesn't specify both channels");
 
