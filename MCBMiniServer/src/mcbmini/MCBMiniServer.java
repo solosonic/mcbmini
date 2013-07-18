@@ -37,6 +37,7 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map.Entry;
 import java.util.TimerTask;
 
 import javax.management.RuntimeErrorException;
@@ -408,6 +409,10 @@ public class MCBMiniServer{
 		}
 	}
 
+//	private List<Request> outgoing_parameters = new ArrayList<Request>();
+
+	private List<Request> outgoing_parameters = new ArrayList<Request>();
+	
 	/**
 	 * This method gets called at the update rate of the controllers from within the update thread
 	 */
@@ -439,19 +444,34 @@ public class MCBMiniServer{
 				last_check_for_timeouts_ms = cur_time;
 			}
 
-			/*
-			 * See if we need to update parameters to any board
-			 */
+//			/*
+//			 * See if we need to update parameters to any board
+//			 */
+//			if( outgoing_parameters.size() > 0 ){
+//				Request parameter = outgoing_parameters.remove( outgoing_parameters.size()-1 );
+//				ser_manager.writeGenericPacket(parameter.board, parameter.channel, parameter.command, false, parameter.value);
+//				
+//				if( outgoing_parameters.size() == 0 ){
+//					// When the last parameter has been sent then we send the enable status
+//					ser_manager.writeGenericPacket(parameter.board, parameter.channel, Command.ENABLE, false, parameter.board.getChannelParameter(parameter.channel, ChannelParameter.ENABLED));
+//				}
+//				ser_manager.sendTxBuffer();
+//				return;
+//			}
+			
+			boolean isSendingParameters = false;
 			for (MCBMiniBoard board : boards) {
 				for (Channel channel : Channel.values()) {
-					HashMap<Command, Integer> dirtyParameters = board.getDirtyParameters(channel);
-					if( dirtyParameters != null ){
-						ser_manager.writeParameterPacket(board, channel, dirtyParameters);
-						// Here we stop the current loop as we already have a big buffer to push out
-						ser_manager.sendTxBuffer();
-						return;
+					ChannelParameter dirtyParameter = board.getDirtyParameter(channel);
+					if( dirtyParameter != null ){
+						isSendingParameters = true;
+						ser_manager.writeGenericPacket(board, channel, dirtyParameter.command, false, board.getChannelParameter(channel, dirtyParameter));
 					}
 				}
+			}
+			if( isSendingParameters ){
+				ser_manager.sendTxBuffer();
+				return;
 			}
 
 			/*

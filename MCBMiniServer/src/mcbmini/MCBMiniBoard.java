@@ -174,7 +174,34 @@ public class MCBMiniBoard {
 		}
 	}
 
+	public ChannelParameter getDirtyParameter(Channel channel){
+		if( !params_dirty[ channel.index ] ) return null;
+		
+		ChannelParameter should_send_enable = null;
+		ChannelParameter entry_to_send = null;
+
+		for (Entry<ChannelParameter, Integer> entry : params[channel.index].entrySet()) {
+			// If parameter value not the same
+			if( entry.getKey().forward_to_board_on_change && !entry.getValue().equals( params_in_use[channel.index].get(entry.getKey()) )){
+				if( entry.getKey() == ChannelParameter.ENABLED ){
+					should_send_enable = ChannelParameter.ENABLED;
+				}
+				params_in_use[channel.index].put(entry.getKey(), entry.getValue());
+				entry_to_send = entry.getKey();
+			}
+		}
+		
+		if( entry_to_send == null ){
+			params_dirty[ channel.index ] = false;
+
+			if( should_send_enable != null ){
+				return should_send_enable;
+			}
+		}
+		return entry_to_send;
+	}
 	
+		
 	/*
 	 * These are convenience methods to get/put parameters
 	 */
@@ -272,38 +299,40 @@ public class MCBMiniBoard {
 	public int getActualPotentiometerValue(Channel channel){ return getChannelParameter(channel, ChannelParameter.ACTUAL_POT); }
 	public int getActualEncoderValue(Channel channel){ return getChannelParameter(channel, ChannelParameter.ACTUAL_ENCODER); }
 
-	/**
-	 * This method returns the set of parameters that need to be updated to a board
-	 * @param channel
-	 * @return null if no parameters need to be updated
-	 */
-	public synchronized HashMap<Command, Integer> getDirtyParameters(Channel channel){
-		if( !params_dirty[channel.index] ) return null;
+//	/**
+//	 * This method returns the set of parameters that need to be updated to a board
+//	 * @param channel
+//	 * @return null if no parameters need to be updated
+//	 */
+//	public synchronized HashMap<Command, Integer> getDirtyParameters(Channel channel){
+//		if( !params_dirty[channel.index] ) return null;
+//
+//		HashMap<Command, Integer> out = new HashMap<Command, Integer>();
+//
+//		/*
+//		 * First we see which ones of the actual ChannelParams need to be updated
+//		 */
+//		for (Entry<ChannelParameter, Integer> entry : params[channel.index].entrySet()) {
+//			// Skip parameters that shouldn't be forwarded on change and also parameters that haven't been set explicitly
+//			if( !entry.getKey().forward_to_board_on_change || entry.getValue().equals( Integer.MAX_VALUE ) ) continue;
+//
+//			Integer val_in_use = params_in_use[channel.index].get( entry.getKey() );
+//			if( val_in_use == null ) val_in_use = -1;
+//
+//			// If the value in use is not the same as the value specified by user, then it needs to be updated
+//			if( !val_in_use.equals( entry.getValue() ) ){
+//				out.put(entry.getKey().command, entry.getValue());
+//				params_in_use[channel.index].put(entry.getKey(), entry.getValue());
+//			}
+//		}
+//
+//		// Reset the dirty flag
+//		params_dirty[channel.index] = false;
+//		return out;
+//	}
 
-		HashMap<Command, Integer> out = new HashMap<Command, Integer>();
-
-		/*
-		 * First we see which ones of the actual ChannelParams need to be updated
-		 */
-		for (Entry<ChannelParameter, Integer> entry : params[channel.index].entrySet()) {
-			// Skip parameters that shouldn't be forwarded on change and also parameters that haven't been set explicitly
-			if( !entry.getKey().forward_to_board_on_change || entry.getValue().equals( Integer.MAX_VALUE ) ) continue;
-
-			Integer val_in_use = params_in_use[channel.index].get( entry.getKey() );
-			if( val_in_use == null ) val_in_use = -1;
-
-			// If the value in use is not the same as the value specified by user, then it needs to be updated
-			if( !val_in_use.equals( entry.getValue() ) ){
-				out.put(entry.getKey().command, entry.getValue());
-				params_in_use[channel.index].put(entry.getKey(), entry.getValue());
-			}
-		}
-
-		// Reset the dirty flag
-		params_dirty[channel.index] = false;
-		return out;
-	}
-
+	
+	
 	/**
 	 * this method should be called when the boards get reset
 	 * @param channel
