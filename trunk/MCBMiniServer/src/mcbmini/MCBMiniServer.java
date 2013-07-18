@@ -427,8 +427,8 @@ public class MCBMiniServer{
 		for (ByteBuffer buffer : ser_manager.handleBufferedSerialData()) {
 			handleCommandInBuffer( buffer );
 		}
-
-		if( !should_skip_firmware_checking && board_firmware_has_been_confirmed ){
+		
+		if( should_skip_firmware_checking || board_firmware_has_been_confirmed ){
 			/*
 			 * Check packet response flags
 			 */
