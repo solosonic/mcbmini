@@ -182,18 +182,26 @@ public class MCBMiniBoard {
 
 		for (Entry<ChannelParameter, Integer> entry : params[channel.index].entrySet()) {
 			// If parameter value not the same
-			if( entry.getKey().forward_to_board_on_change && !entry.getValue().equals( params_in_use[channel.index].get(entry.getKey()) )){
+			if( 	entry.getKey().forward_to_board_on_change &&	// If this parameter should be forwarded
+					!entry.getValue().equals( Integer.valueOf(Integer.MAX_VALUE) ) && // And it has been initialized
+					!entry.getValue().equals( params_in_use[channel.index].get(entry.getKey()) )) // And it is different from what we sent last
+			{
+
 				if( entry.getKey() == ChannelParameter.ENABLED ){
 					should_send_enable = ChannelParameter.ENABLED;
+					continue;
 				}
 				params_in_use[channel.index].put(entry.getKey(), entry.getValue());
 				entry_to_send = entry.getKey();
+				break;
 			}
 		}
 		
+		// If we found no entry to send
 		if( entry_to_send == null ){
 			params_dirty[ channel.index ] = false;
 
+			// If we found no entry to send
 			if( should_send_enable != null ){
 				return should_send_enable;
 			}
