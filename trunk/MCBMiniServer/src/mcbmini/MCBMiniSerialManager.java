@@ -61,7 +61,7 @@ public class MCBMiniSerialManager {
 // If this is too low then we start getting packet collisions
 
 	public static final int MIN_MASTER_PACKET_SIZE_OLD_FIRMWARE = 25;
-	public static final int MIN_MASTER_PACKET_SIZE_NEW_FIRMWARE = 25;
+	public static final int MIN_MASTER_PACKET_SIZE_NEW_FIRMWARE = 17;
 	private int minMasterPacketSize = MIN_MASTER_PACKET_SIZE_OLD_FIRMWARE;
 	
 	public static final byte HEADER_BYTE = (byte)0xAA;
