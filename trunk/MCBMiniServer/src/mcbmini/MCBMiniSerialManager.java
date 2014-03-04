@@ -146,11 +146,12 @@ public class MCBMiniSerialManager {
 
 				// Now we calculate the checksum in the package using the expected number of bytes
 				byte cmd = read_bb.get( read_bb.position()-2 );
-				Command command = MCBMiniConstants.Command.getForCmdId(cmd & 0xff);
+				cmd &= 0x7F;
+				Command command = MCBMiniConstants.Command.getForCmdId(cmd);
 				int expectedNumberOfBytes = 2 + command.datasize.number_of_bytes;
 				
 				if( read_bb.position() < expectedNumberOfBytes ){
-					Log.println("Improper packet size");
+					Log.println("Improper packet size, expected "+expectedNumberOfBytes+" but received "+read_bb.position());
 					ByteBufferUtils.printByteBuffer(read_bb, read_bb.position());
 					read_bb.clear();
 					continue;
